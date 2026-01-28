@@ -1,14 +1,31 @@
 /**
  * API layer barrel export
+ * Aquí inicializamos y exportamos las instancias listas para usar
  */
 
-// Base client
-export { createApiClient, ApiClientError, type ApiClient } from './client';
+import { createAuthApi } from './auth.api';
+import { createJourneyApi } from './journey.api';
+import { createWebhookApi } from './webhook.api';
 
-// Service clients
-export { createAuthApi, type AuthApi } from './auth.api';
-export { createJourneyApi, type JourneyApi } from './journey.api';
-export { createWebhookApi, type WebhookApi } from './webhook.api';
+// 1. Función para obtener el token
+// Esta función se ejecuta en cada petición, permitiendo que el token se actualice dinámicamente
+const getAccessToken = async () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('oasis_token');
+  }
+  return null;
+};
 
-// Types
+// 2. Crear instancias Singleton
+// Estas son las variables que importas como `import { authApi } ...`
+export const authApi = createAuthApi(getAccessToken);
+export const journeyApi = createJourneyApi(getAccessToken);
+export const webhookApi = createWebhookApi(getAccessToken);
+
+// 3. Exportar tipos y fábricas
+// Por si necesitas los tipos en otros archivos
+export * from './client';
 export * from './types';
+export * from './auth.api';
+export * from './journey.api';
+export * from './webhook.api';
