@@ -1,7 +1,7 @@
 "use client";
 
-import { Sidebar } from "@/frontend/components/dashboard/Sidebar";
-import { BackgroundWaves } from "@/frontend/components/visuals/BackgroundWaves";
+import { Sidebar } from "@/shared/components/layout/Sidebar";
+import { BackgroundWaves } from "@/shared/visuals/BackgroundWaves";
 import { OASISChat } from "@/frontend/components/ai/OASISChat";
 import { ForumBanner } from "@/frontend/components/participant/ForumBanner";
 import { UserProvider } from "@/frontend/context/UserProvider";
