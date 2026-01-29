@@ -6,9 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
 import { Loader2, Mail, Lock } from "lucide-react";
-import { toast } from "sonner"; // Usamos Sonner directamente
+import { toast } from "sonner";
 
-// Componentes UI compartidos
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import {
@@ -27,18 +26,46 @@ import {
   FormLabel,
   FormMessage,
 } from "@/shared/components/ui/form";
-import { authApi } from "@/core/api";
+import { Separator } from "@/shared/components/ui/separator";
+import { createClient } from "@/backend/supabase/client";
 
-// Schema de validación
+// Schema de validacion
 const loginSchema = z.object({
-  email: z.string().email("Ingresa un correo electrónico válido"),
-  password: z.string().min(1, "La contraseña es obligatoria"),
+  email: z.string().email("Ingresa un correo electronico valido"),
+  password: z.string().min(1, "La contrasena es obligatoria"),
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
 
+// Google Icon Component
+function GoogleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24">
+      <path
+        fill="currentColor"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      />
+      <path
+        fill="currentColor"
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      />
+      <path
+        fill="currentColor"
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+      />
+      <path
+        fill="currentColor"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+      />
+    </svg>
+  );
+}
+
 export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  const supabase = createClient();
 
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -48,29 +75,77 @@ export function LoginForm() {
     },
   });
 
+  // Login con email/password via Supabase
   async function onSubmit(values: LoginValues) {
     setIsLoading(true);
     try {
-      const response = await authApi.login(values);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: values.email,
+        password: values.password,
+      });
 
-      if (response?.access_token) {
-        // Almacenar tokens (idealmente usar cookies HttpOnly en prod, pero localStorage es funcional aquí)
-        localStorage.setItem("oasis_token", response.access_token);
-        if (response.refresh_token) {
-          localStorage.setItem("oasis_refresh_token", response.refresh_token);
+      if (error) {
+        console.error("Error en login:", error);
+        if (error.message.includes("Invalid login credentials")) {
+          toast.error("Credenciales incorrectas");
+        } else if (error.message.includes("Email not confirmed")) {
+          toast.error("Por favor confirma tu email antes de iniciar sesion");
+        } else {
+          toast.error(error.message);
+        }
+        return;
+      }
+
+      if (data.session) {
+        // Log audit event
+        try {
+          await supabase.rpc('log_login', {
+            p_provider: 'email',
+            p_user_agent: navigator.userAgent
+          });
+        } catch (auditError) {
+          // Silent fail for audit - don't block login
+          console.warn("Audit log failed:", auditError);
         }
 
-        toast.success("¡Bienvenido de vuelta!");
+        toast.success("Bienvenido de vuelta!");
 
-        // Hard refresh para limpiar el estado de la aplicación y recargar contextos
+        // Refresh para cargar el AuthProvider con la nueva sesion
         window.location.href = "/";
       }
     } catch (error: any) {
       console.error("Error en login:", error);
-      const message = error.response?.data?.detail || "Credenciales incorrectas o error de conexión.";
-      toast.error(message);
+      toast.error("Error de conexion. Intenta nuevamente.");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  // Login con Google via Supabase OAuth
+  async function handleGoogleLogin() {
+    setIsGoogleLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) {
+        console.error("Error Google login:", error);
+        toast.error("Error al iniciar sesion con Google");
+      }
+      // Si no hay error, Supabase redirige automaticamente a Google
+    } catch (error) {
+      console.error("Error Google login:", error);
+      toast.error("Error de conexion con Google");
+    } finally {
+      setIsGoogleLoading(false);
     }
   }
 
@@ -82,7 +157,35 @@ export function LoginForm() {
           Ingresa tus credenciales para acceder
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        {/* Google OAuth Button */}
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={handleGoogleLogin}
+          disabled={isGoogleLoading || isLoading}
+        >
+          {isGoogleLoading ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <GoogleIcon className="mr-2 h-4 w-4" />
+          )}
+          Continuar con Google
+        </Button>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <Separator className="w-full" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">
+              O continua con email
+            </span>
+          </div>
+        </div>
+
+        {/* Email/Password Form */}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -90,14 +193,14 @@ export function LoginForm() {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Correo Electrónico</FormLabel>
+                  <FormLabel>Correo Electronico</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        placeholder="usuario@empresa.com" 
-                        className="pl-9" 
-                        {...field} 
+                      <Input
+                        placeholder="usuario@empresa.com"
+                        className="pl-9"
+                        {...field}
                       />
                     </div>
                   </FormControl>
@@ -111,12 +214,12 @@ export function LoginForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="flex items-center justify-between">
-                    Contraseña
+                    Contrasena
                     <Link
                       href="/forgot-password"
                       className="text-xs text-primary hover:underline"
                     >
-                      ¿Olvidaste tu contraseña?
+                      Olvidaste tu contrasena?
                     </Link>
                   </FormLabel>
                   <FormControl>
@@ -124,7 +227,7 @@ export function LoginForm() {
                       <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
                         type="password"
-                        placeholder="••••••••"
+                        placeholder="********"
                         className="pl-9"
                         {...field}
                       />
@@ -134,14 +237,14 @@ export function LoginForm() {
                 </FormItem>
               )}
             />
-            <Button className="w-full" type="submit" disabled={isLoading}>
+            <Button className="w-full" type="submit" disabled={isLoading || isGoogleLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Ingresando...
                 </>
               ) : (
-                "Iniciar Sesión"
+                "Iniciar Sesion"
               )}
             </Button>
           </form>
@@ -149,9 +252,9 @@ export function LoginForm() {
       </CardContent>
       <CardFooter className="justify-center border-t p-4">
         <p className="text-sm text-muted-foreground">
-          ¿No tienes una cuenta?{" "}
+          No tienes una cuenta?{" "}
           <Link href="/register" className="font-medium text-primary hover:underline">
-            Regístrate aquí
+            Registrate aqui
           </Link>
         </p>
       </CardFooter>

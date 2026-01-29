@@ -164,11 +164,13 @@ if global_settings.BACKEND_CORS_ORIGINS:
 # Custom exception handler for consistent error responses
 app.add_exception_handler(OasisException, oasis_exception_handler)
 
-# Rate limiting - auth endpoints get stricter limits
+# Rate limiting - disabled in development, stricter for auth in production
+is_development = global_settings.ENVIRONMENT in ("development", "local", "dev")
+
 setup_rate_limiting(
     app,
     RateLimitConfig(
-        enabled=True,
+        enabled=not is_development,  # False in dev, True in prod
         default_limit="200/minute",
         auth_limit="20/minute",  # Stricter for login/register
         write_limit="100/minute",

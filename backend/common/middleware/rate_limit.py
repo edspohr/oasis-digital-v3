@@ -55,7 +55,7 @@ class RateLimitConfig:
     read_limit: str = "300/minute"  # GET requests
 
     # Headers
-    headers_enabled: bool = True  # Include X-RateLimit-* headers
+    headers_enabled: bool = False  # Include X-RateLimit-* headers
 
 
 # =============================================================================

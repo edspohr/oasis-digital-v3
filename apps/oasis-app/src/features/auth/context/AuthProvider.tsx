@@ -256,10 +256,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Sign out
   const signOut = useCallback(async () => {
+    // Log audit event before signing out
+    try {
+      await supabase.rpc('log_logout');
+    } catch (auditError) {
+      // Silent fail for audit - don't block logout
+      console.warn("Audit log failed:", auditError);
+    }
+
     await supabase.auth.signOut();
+    // Clear tokens from localStorage
+    localStorage.removeItem('oasis_token');
+    localStorage.removeItem('oasis_refresh_token');
     setState({ profile: null, currentOrg: null, myOrganizations: [] });
     deleteCookie(ORG_COOKIE_NAME);
-  }, [supabase.auth]);
+  }, [supabase]);
 
   // Initialize on mount
   useEffect(() => {
@@ -270,8 +281,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
+        // Sync tokens to localStorage for API client usage
+        localStorage.setItem('oasis_token', session.access_token);
+        localStorage.setItem('oasis_refresh_token', session.refresh_token ?? '');
         fetchUserData();
       } else {
+        // Clear tokens on logout
+        localStorage.removeItem('oasis_token');
+        localStorage.removeItem('oasis_refresh_token');
         setState({ profile: null, currentOrg: null, myOrganizations: [] });
         deleteCookie(ORG_COOKIE_NAME);
         setIsLoading(false);

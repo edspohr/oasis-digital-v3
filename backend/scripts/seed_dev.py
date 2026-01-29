@@ -30,7 +30,7 @@ from supabase import Client, create_client
 # CONFIGURATION
 # =============================================================================
 
-DEFAULT_API_URL = "http://localhost:8000/api/v1"
+DEFAULT_API_URL = "http://localhost:8001/api/v1"
 DEFAULT_PASSWORD = "Test123!"
 
 

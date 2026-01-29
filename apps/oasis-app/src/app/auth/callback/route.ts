@@ -26,12 +26,23 @@ export async function GET(request: Request) {
         },
       }
     );
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error && data.session) {
+      // Log audit event for OAuth login
+      try {
+        await supabase.rpc('log_login', {
+          p_provider: 'google',
+          p_user_agent: request.headers.get('user-agent') || 'OAuth Callback'
+        });
+      } catch (auditError) {
+        // Silent fail for audit - don't block login
+        console.warn("Audit log failed:", auditError);
+      }
+
       return NextResponse.redirect(`${origin}${next}`);
     }
   }
 
-  // return the user to an error page with instructions
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`);
+  // Return the user to login with error
+  return NextResponse.redirect(`${origin}/login?error=auth_callback_error`);
 }

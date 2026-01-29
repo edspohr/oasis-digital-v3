@@ -4,7 +4,7 @@ import { Sidebar } from "@/shared/components/layout/Sidebar";
 import { BackgroundWaves } from "@/shared/visuals/BackgroundWaves";
 import { OASISChat } from "@/frontend/components/ai/OASISChat";
 import { ForumBanner } from "@/frontend/components/participant/ForumBanner";
-import { UserProvider } from "@/frontend/context/UserProvider";
+import { AuthProvider } from "@/features/auth/context/AuthProvider";
 
 export default function PlatformLayout({
   children,
@@ -12,7 +12,7 @@ export default function PlatformLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <UserProvider>
+    <AuthProvider>
       <div className="relative min-h-screen bg-gray-50/50 flex overflow-hidden">
           <BackgroundWaves />
 
@@ -29,6 +29,6 @@ export default function PlatformLayout({
 
           <OASISChat />
       </div>
-    </UserProvider>
+    </AuthProvider>
   );
 }
