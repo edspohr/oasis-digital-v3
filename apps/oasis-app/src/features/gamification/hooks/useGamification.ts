@@ -3,7 +3,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/backend/supabase/client';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import type { UserStats, Badge, LeaderboardEntry } from '@/core/types';
+// Importamos los tipos exactos de tu definición
+import type { UserStats, Badge, LeaderboardEntry } from '@/core/types/journey';
+
+const POINTS_PER_LEVEL = 100;
 
 interface UseGamificationReturn {
   stats: UserStats | null;
@@ -15,7 +18,7 @@ interface UseGamificationReturn {
 }
 
 export function useGamification(): UseGamificationReturn {
-  const { profile, currentOrg } = useAuth();
+  const { profile } = useAuth();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [badges, setBadges] = useState<Badge[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -37,189 +40,144 @@ export function useGamification(): UseGamificationReturn {
       setIsLoading(true);
       setError(null);
 
-      // Fetch user stats from enrollments
-      const { data: enrollments, error: enrollmentsError } = await supabase
+      // -----------------------------------------------------------------------
+      // 1. Obtener Métricas del Usuario
+      // -----------------------------------------------------------------------
+      
+      // A. Inscripciones
+      const { data: enrollments, error: enrollError } = await supabase
+        .schema('journeys')
         .from('enrollments')
-        .select('status, points_earned')
+        .select('status, progress_percentage')
         .eq('user_id', profile.id);
 
-      if (enrollmentsError) throw enrollmentsError;
+      if (enrollError) throw new Error(`Enrollments Error: ${enrollError.message}`);
 
-      // Calculate stats
-      const totalPoints = (enrollments || []).reduce(
-        (sum, e) => sum + (e.points_earned || 0),
-        0
-      );
-      const completedJourneys = (enrollments || []).filter(
-        (e) => e.status === 'completed'
-      ).length;
-      const inProgressJourneys = (enrollments || []).filter(
-        (e) => e.status === 'in_progress' || e.status === 'enrolled'
-      ).length;
+      // B. Puntos Totales
+      const { data: pointsData, error: pointsError } = await supabase
+        .schema('journeys')
+        .from('points_ledger')
+        .select('amount')
+        .eq('user_id', profile.id);
 
-      // Calculate level based on points
-      const levelThresholds = [0, 100, 300, 600, 1000, 1500, 2100, 2800, 3600, 4500];
-      const levelNames = [
-        'Novato',
-        'Aprendiz',
-        'Explorador',
-        'Aventurero',
-        'Veterano',
-        'Experto',
-        'Maestro',
-        'Leyenda',
-        'Campeón',
-        'Héroe',
-      ];
+      if (pointsError) throw new Error(`Points Error: ${pointsError.message}`);
 
-      let level = 1;
-      for (let i = levelThresholds.length - 1; i >= 0; i--) {
-        if (totalPoints >= levelThresholds[i]) {
-          level = i + 1;
-          break;
-        }
-      }
-
-      const currentLevelThreshold = levelThresholds[level - 1] || 0;
-      const nextLevelThreshold = levelThresholds[level] || levelThresholds[level - 1] + 500;
-      const levelProgress = Math.min(
-        100,
-        Math.round(
-          ((totalPoints - currentLevelThreshold) /
-            (nextLevelThreshold - currentLevelThreshold)) *
-            100
-        )
-      );
-
-      // Fetch user badges/rewards
-      const { data: userBadges, error: badgesError } = await supabase
-        .from('user_badges')
+      // C. Medallas Ganadas
+      const { data: rewardsData, error: rewardsError } = await supabase
+        .schema('journeys')
+        .from('user_rewards')
         .select(`
-          *,
-          badge:badges (
-            id,
-            name,
-            description,
-            icon_url,
-            category,
-            points_required
+          earned_at,
+          reward:rewards_catalog (
+            id, name, description, icon_url, type
           )
         `)
         .eq('user_id', profile.id);
 
-      if (badgesError) {
-        console.error('Error fetching badges:', badgesError);
-      }
+      if (rewardsError) throw new Error(`Rewards Error: ${rewardsError.message}`);
 
-      const earnedBadges: Badge[] = (userBadges || [])
-        .map((ub) => {
-          const badgeData = Array.isArray(ub.badge) ? ub.badge[0] : ub.badge;
-          if (!badgeData) return null;
-          return {
-            ...badgeData,
-            earned_at: ub.earned_at,
-          } as Badge;
-        })
-        .filter((b): b is Badge => b !== null);
+      // -----------------------------------------------------------------------
+      // 2. Procesamiento de Datos (Cálculos)
+      // -----------------------------------------------------------------------
 
-      // Fetch leaderboard for current organization
-      if (currentOrg) {
-        const { data: leaderboardData, error: leaderboardError } = await supabase
-          .schema('journeys')
-          .from('enrollments')
-          .select(`
-            user_id,
-            points_earned,
-            profile:profiles (
-              id,
-              full_name,
-              avatar_url
-            )
-          `)
-          .eq('status', 'completed')
-          .order('points_earned', { ascending: false })
-          .limit(10);
+      const totalPoints = pointsData?.reduce((sum, item) => sum + item.amount, 0) || 0;
+      const currentLevel = Math.floor(totalPoints / POINTS_PER_LEVEL) + 1;
+      const levelProgress = totalPoints % POINTS_PER_LEVEL;
+      
+      const completedJourneys = enrollments?.filter(e => e.status === 'completed').length || 0;
+      const activeJourneys = enrollments?.filter(e => e.status === 'active' || e.status === 'in_progress').length || 0;
 
-        if (leaderboardError) {
-          console.error('Error fetching leaderboard:', leaderboardError);
-        } else {
-          // Group by user and sum points
-          const userPointsMap = new Map<
-            string,
-            { points: number; name: string; avatar: string | null }
-          >();
+      // FIX: Mapeo estricto a la interfaz Badge (category en lugar de type)
+      const formattedBadges: Badge[] = (rewardsData || []).map((item: any) => ({
+        id: item.reward?.id,
+        name: item.reward?.name || 'Medalla',
+        description: item.reward?.description || '',
+        icon_url: item.reward?.icon_url || '',
+        earned_at: item.earned_at,
+        // Aquí asignamos el 'type' de la BD a la propiedad 'category' requerida por tu interfaz
+        category: item.reward?.type || 'achievement' 
+      }));
 
-          for (const entry of leaderboardData || []) {
-            const profileData = Array.isArray(entry.profile)
-              ? entry.profile[0]
-              : entry.profile;
+      // -----------------------------------------------------------------------
+      // 3. Leaderboard
+      // -----------------------------------------------------------------------
+      
+      const { data: allPoints, error: leaderboardError } = await supabase
+        .schema('journeys')
+        .from('points_ledger')
+        .select('user_id, amount');
 
-            if (!profileData) continue;
+      if (leaderboardError) throw new Error(`Leaderboard Error: ${leaderboardError.message}`);
 
-            const existing = userPointsMap.get(entry.user_id);
-            if (existing) {
-              existing.points += entry.points_earned || 0;
-            } else {
-              userPointsMap.set(entry.user_id, {
-                points: entry.points_earned || 0,
-                name: profileData.full_name || 'Usuario',
-                avatar: profileData.avatar_url,
-              });
-            }
-          }
-
-          // Sort and create leaderboard entries
-          const sortedEntries = Array.from(userPointsMap.entries())
-            .sort((a, b) => b[1].points - a[1].points)
-            .slice(0, 10);
-
-          const leaderboardEntries: LeaderboardEntry[] = sortedEntries.map(
-            ([userId, data], index) => ({
-              rank: index + 1,
-              user_id: userId,
-              full_name: data.name,
-              avatar_url: data.avatar,
-              points: data.points,
-              level: Math.floor(data.points / 100) + 1,
-              badges_count: 0,
-            })
-          );
-
-          setLeaderboard(leaderboardEntries);
-        }
-      }
-
-      setStats({
-        total_points: totalPoints,
-        level,
-        level_name: levelNames[level - 1] || 'Novato',
-        level_progress: levelProgress,
-        journeys_completed: completedJourneys,
-        journeys_in_progress: inProgressJourneys,
-        badges_earned: earnedBadges.length,
+      const pointsByUser = new Map<string, number>();
+      allPoints?.forEach((entry) => {
+        const current = pointsByUser.get(entry.user_id) || 0;
+        pointsByUser.set(entry.user_id, current + entry.amount);
       });
 
-      setBadges(earnedBadges);
-    } catch (err) {
-      console.error('Error fetching gamification data:', err);
-      setError(
-        err instanceof Error ? err.message : 'Error al cargar datos de gamificación'
-      );
+      const topUsers = Array.from(pointsByUser.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+
+      const topUserIds = topUsers.map(([uid]) => uid);
+
+      let leaderboardEntries: LeaderboardEntry[] = [];
+      
+      if (topUserIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', topUserIds);
+
+        // FIX: Mapeo estricto a LeaderboardEntry (sin campos extra como level o badges_count)
+        leaderboardEntries = topUsers.map(([uid, points], index) => {
+          const userProfile = profilesData?.find(p => p.id === uid);
+          return {
+            rank: index + 1,
+            user_id: uid,
+            full_name: userProfile?.full_name || 'Usuario Anónimo',
+            avatar_url: userProfile?.avatar_url || null,
+            points: points
+          };
+        });
+      }
+
+      // -----------------------------------------------------------------------
+      // 4. Actualizar Estado
+      // -----------------------------------------------------------------------
+      
+      setStats({
+        total_points: totalPoints,
+        level: currentLevel,
+        level_name: `Nivel ${currentLevel}`,
+        level_progress: levelProgress,
+        journeys_completed: completedJourneys,
+        journeys_in_progress: activeJourneys,
+        badges_earned: formattedBadges.length,
+        rank: leaderboardEntries.find(e => e.user_id === profile.id)?.rank
+      });
+
+      setBadges(formattedBadges);
+      setLeaderboard(leaderboardEntries);
+
+    } catch (err: any) {
+      console.error('Gamification Fetch Error:', JSON.stringify(err, null, 2));
+      setError(err instanceof Error ? err.message : 'Error cargando gamificación');
     } finally {
       setIsLoading(false);
     }
-  }, [profile, currentOrg, supabase]);
+  }, [profile, supabase]);
 
   useEffect(() => {
     fetchGamificationData();
   }, [fetchGamificationData]);
 
-  return {
-    stats,
-    badges,
-    leaderboard,
-    isLoading,
-    error,
-    refresh: fetchGamificationData,
+  return { 
+    stats, 
+    badges, 
+    leaderboard, 
+    isLoading, 
+    error, 
+    refresh: fetchGamificationData 
   };
 }
