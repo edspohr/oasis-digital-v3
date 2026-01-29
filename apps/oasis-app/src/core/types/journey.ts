@@ -157,4 +157,6 @@ export interface LeaderboardEntry {
   full_name: string;
   avatar_url: string | null;
   points: number;
+  level: number;
+  badges_count: number;
 }

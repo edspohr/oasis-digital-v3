@@ -129,15 +129,18 @@ export function useGamification(): UseGamificationReturn {
           .select('id, full_name, avatar_url')
           .in('id', topUserIds);
 
-        // FIX: Mapeo estricto a LeaderboardEntry (sin campos extra como level o badges_count)
         leaderboardEntries = topUsers.map(([uid, points], index) => {
           const userProfile = profilesData?.find(p => p.id === uid);
+          // Calculate level based on points (same formula as user's level)
+          const userLevel = Math.floor(points / 100) + 1;
           return {
             rank: index + 1,
             user_id: uid,
             full_name: userProfile?.full_name || 'Usuario Anónimo',
             avatar_url: userProfile?.avatar_url || null,
-            points: points
+            points: points,
+            level: userLevel,
+            badges_count: 0, // TODO: Fetch from user_rewards when implemented
           };
         });
       }

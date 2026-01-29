@@ -1,8 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { PUBLIC_ROUTES, matchRoute, findRouteConfig } from '@/core/config/routes';
-import { hasPermission } from '@/core/config/permissions';
-import type { OrganizationRole } from '@/core/types';
 
 const ORG_COOKIE_NAME = 'oasis_current_org';
 
@@ -37,53 +35,44 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // 2. AUTENTICADO EN RUTA DE LOGIN (Dispatcher)
-  if (user && (path === '/login' || path === '/register' || path === '/')) {
-    // Aquí dejamos pasar a '/' para que page.tsx haga el despacho al dashboard correcto
-    if (path === '/') return response;
-    // Si está en login, lo mandamos a la raíz para ser despachado
+  // 2. LOGUEADO EN RUTA PÚBLICA
+  if (user && (path === '/login' || path === '/register')) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
-  // 3. VERIFICACIÓN DE PERMISOS (RBAC)
-  const routeConfig = findRouteConfig(path);
-  if (routeConfig && user) {
-    const orgId = request.cookies.get(ORG_COOKIE_NAME)?.value;
+  // 3. PROTECCIÓN DE RUTAS /admin (CRÍTICO: Aquí estaba el error)
+  if (path.startsWith('/admin')) {
+    // A. Verificar si es Platform Admin (Superusuario)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_platform_admin')
+      .eq('id', user?.id)
+      .single();
 
-    // A. Platform Admin
-    if (routeConfig.isPlatformAdminOnly) {
-      // Leemos el perfil directamente
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_platform_admin')
-        .eq('id', user.id)
+    if (profile?.is_platform_admin) {
+      return response; // Pase directo al superadmin
+    }
+
+    // B. Verificar rol en la organización actual (Si no es superadmin)
+    const orgId = request.cookies.get(ORG_COOKIE_NAME)?.value;
+    
+    if (orgId) {
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('role')
+        .eq('user_id', user?.id)
+        .eq('organization_id', orgId)
         .single();
 
-      if (!profile?.is_platform_admin) {
-        // ERROR DE PERMISO: Mandar a /participant para EVITAR LOOP
-        return NextResponse.redirect(new URL('/participant', request.url));
+      const role = membership?.role;
+      // Roles permitidos en /admin (owner, admin, facilitador)
+      if (role === 'owner' || role === 'admin' || role === 'facilitador') {
+        return response; // Pase concedido
       }
     }
-    
-    // B. Org Roles
-    else if (routeConfig.minRole || routeConfig.roles) {
-      let query = supabase.from('organization_members').select('role').eq('user_id', user.id).eq('status', 'active');
-      if (orgId) query = query.eq('organization_id', orgId);
-      
-      const { data: membership } = await query.limit(1).single();
 
-      if (!membership) {
-        return NextResponse.redirect(new URL('/participant', request.url));
-      }
-
-      const userRole = membership.role as OrganizationRole;
-      if (
-        (routeConfig.roles && !routeConfig.roles.includes(userRole)) ||
-        (routeConfig.minRole && !hasPermission(userRole, routeConfig.minRole))
-      ) {
-        return NextResponse.redirect(new URL('/participant', request.url));
-      }
-    }
+    // C. Si fallan las comprobaciones, redirigir a participant (PERO NO SI YA ESTAMOS AHÍ)
+    return NextResponse.redirect(new URL('/participant', request.url));
   }
 
   return response;

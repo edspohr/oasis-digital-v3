@@ -68,7 +68,7 @@ const ORG_TYPES: { value: OrganizationType; label: string; description: string }
 ];
 
 export function OrganizationSettings() {
-  const { currentOrg, refreshUser } = useAuth();
+  const { currentOrg, refreshProfile } = useAuth();
   const [formData, setFormData] = useState<OrgFormData>({
     name: '',
     slug: '',
@@ -168,7 +168,7 @@ export function OrganizationSettings() {
 
       if (updateError) throw updateError;
 
-      await refreshUser();
+      await refreshProfile();
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {

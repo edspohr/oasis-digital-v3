@@ -6,8 +6,7 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { LoadingSpinner } from "@/shared/components/feedback/LoadingSpinner";
 
 export default function RootPage() {
-  // CORRECCIÓN: Quitamos 'session' y usamos 'profile' para validar auth
-  const { profile, isLoading } = useAuth(); 
+  const { profile, currentOrg, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -19,17 +18,18 @@ export default function RootPage() {
       return;
     }
 
-    // Lógica de Despacho por Rol
-    const role = (profile as any).role;
-    const isStaff = ["owner", "admin", "facilitador", "facilitator"].includes(role) || (profile as any).is_platform_admin;
+    // El rol está en currentOrg.myMembership.role, NO en profile
+    const role = currentOrg?.myMembership?.role;
+    const isPlatformAdmin = profile.is_platform_admin;
+    const isStaff = isPlatformAdmin || (role && ["owner", "admin", "facilitador"].includes(role));
 
     if (isStaff) {
-      const target = (role === 'facilitador' || role === 'facilitator') ? '/facilitator' : '/admin';
+      const target = role === 'facilitador' ? '/facilitator' : '/admin';
       router.replace(target);
     } else {
       router.replace("/participant");
     }
-  }, [profile, isLoading, router]);
+  }, [profile, currentOrg, isLoading, router]);
 
   return (
     <div className="h-screen w-full flex items-center justify-center bg-gray-50">

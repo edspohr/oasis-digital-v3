@@ -64,7 +64,7 @@ AS $$
 DECLARE
     v_community_org_id UUID;
 BEGIN
-    IF NEW.email = 'tech@fsummer.org' THEN
+    IF NEW.email = 'felipe@sumadots.com' THEN
         -- Find Community Org
         SELECT id INTO v_community_org_id
         FROM public.organizations

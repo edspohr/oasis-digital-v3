@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 export type ViewMode = 'participant' | 'management';
 
@@ -16,45 +16,58 @@ interface ViewModeContextType {
 const ViewModeContext = createContext<ViewModeContextType | undefined>(undefined);
 
 export function ViewModeProvider({ children }: { children: React.ReactNode }) {
-  const { profile, isLoading: authLoading } = useAuth();
+  // EXTRAEMOS currentOrg ADEMÁS DE profile
+  const { profile, currentOrg, isLoading: authLoading } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>('participant');
   const pathname = usePathname();
+  const router = useRouter();
 
-  // Determinar si es staff (Admin, Owner, Facilitador o Platform Admin)
+  // --- Lógica de Detección de Staff (CORREGIDA) ---
   const isStaff = React.useMemo(() => {
     if (!profile) return false;
+
+    // 1. Si es Super Admin de la plataforma, siempre es staff
     if (profile.is_platform_admin) return true;
-    const role = (profile as any).role; // Si el rol viene en el perfil plano
-    return ['owner', 'admin', 'facilitador', 'facilitator'].includes(role);
-  }, [profile]);
 
+    // 2. Si no, miramos su rol en la ORGANIZACIÓN ACTUAL
+    const orgRole = currentOrg?.myMembership?.role;
+
+    // Lista de roles permitidos para ver el modo gestión
+    const staffRoles = ['owner', 'admin', 'facilitador'];
+
+    return orgRole ? staffRoles.includes(orgRole) : false;
+  }, [profile, currentOrg]);
+
+  // --- Sincronización Automática ---
   useEffect(() => {
-    if (authLoading) return; // Esperar a que auth termine
+    if (authLoading) return;
 
-    // 1. Sincronizar URL con Modo
+    // 1. Forzar modo según la URL actual (Anti-confusión)
     if (pathname?.startsWith('/admin') || pathname?.startsWith('/facilitator')) {
       if (viewMode !== 'management') setViewMode('management');
     } else if (pathname?.startsWith('/participant')) {
       if (viewMode !== 'participant') setViewMode('participant');
     }
     
-    // 2. Si es Staff y entra a la raíz, por defecto management
-    if (isStaff && pathname === '/') {
-        // Dejamos que page.tsx redirija, no forzamos estado aquí todavía
+    // 2. Si el usuario pierde permisos de staff, forzar participante
+    if (!isStaff && viewMode === 'management') {
+      setViewMode('participant');
     }
 
   }, [pathname, isStaff, authLoading, viewMode]);
 
+  // --- Acción de Cambio ---
   const toggleViewMode = () => {
-    if (!isStaff) return;
+    if (!isStaff) return; // Seguridad extra
+
     const newMode = viewMode === 'management' ? 'participant' : 'management';
     setViewMode(newMode);
     
-    // Redirección opcional al cambiar modo
+    // Redirección inteligente
     if (newMode === 'management') {
-      window.location.href = '/admin';
+      router.push('/admin');
     } else {
-      window.location.href = '/participant';
+      router.push('/participant');
     }
   };
 

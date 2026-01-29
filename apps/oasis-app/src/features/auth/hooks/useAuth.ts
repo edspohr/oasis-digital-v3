@@ -23,3 +23,13 @@ export const useProfile = () => {
   const context = useAuth();
   return context.profile;
 };
+
+// 4. Hook Auxiliar: Rol del usuario en la organización actual
+export const useRole = () => {
+  const { currentOrg, profile } = useAuth();
+
+  return {
+    role: currentOrg?.myMembership?.role || null,
+    isPlatformAdmin: profile?.is_platform_admin || false,
+  };
+};

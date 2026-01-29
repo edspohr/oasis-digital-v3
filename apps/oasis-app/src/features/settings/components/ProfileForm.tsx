@@ -31,7 +31,7 @@ interface ProfileFormData {
 }
 
 export function ProfileForm() {
-  const { profile, refreshUser } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const [formData, setFormData] = useState<ProfileFormData>({
     full_name: '',
     avatar_url: '',
@@ -72,7 +72,7 @@ export function ProfileForm() {
 
       if (updateError) throw updateError;
 
-      await refreshUser();
+      await refreshProfile();
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {

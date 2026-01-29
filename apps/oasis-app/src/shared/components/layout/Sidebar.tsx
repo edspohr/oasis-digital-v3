@@ -50,11 +50,10 @@ const facilitatorRoutes: SidebarItem[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { profile, isLoading, signOut } = useAuth();
+  const { profile, currentOrg, isLoading, signOut } = useAuth();
   const { viewMode } = useViewMode();
-  
+
   // Estado para colapsar el sidebar
-  // Puedes inicializarlo leyendo localStorage si quieres persistencia
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handleLogout = async () => {
@@ -75,10 +74,12 @@ export function Sidebar() {
       items = participantRoutes;
     } else {
       // Modo Gestión: Diferenciar entre Admin y Facilitador
-      const role = (profile as any).role;
-      if (role === 'facilitador' || role === 'facilitator') {
+      // El rol está en currentOrg.myMembership.role, NO en profile
+      const role = currentOrg?.myMembership?.role;
+      if (role === 'facilitador') {
         items = facilitatorRoutes;
       } else {
+        // owner, admin, o platform_admin ven rutas de admin
         items = adminRoutes;
       }
     }
