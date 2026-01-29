@@ -14,6 +14,7 @@ import type {
   Badge,
   LeaderboardEntry,
   JourneyStatus,
+  TrackProgressPayload, // <--- Asegúrate de importar esto
 } from '@/core/types';
 import type { PaginatedResponse, PaginationParams } from './types';
 
@@ -78,7 +79,7 @@ export function createJourneyApi(
   onUnauthorized?: () => void
 ) {
   const client = createApiClient({
-    baseUrl: SERVICES.JOURNEY,
+    baseUrl: process.env.NEXT_PUBLIC_JOURNEY_SERVICE_URL || SERVICES.JOURNEY, // Fallback robusto
     getAccessToken,
     getOrganizationId,
     onUnauthorized,
@@ -241,7 +242,7 @@ export function createJourneyApi(
     },
 
     /**
-     * Complete a step
+     * Complete a step (Standard Enrollment Method)
      */
     completeStep(
       enrollmentId: string,
@@ -252,6 +253,18 @@ export function createJourneyApi(
         `/enrollments/${enrollmentId}/steps/${stepId}/complete`,
         data
       );
+    },
+
+    // ========================================================================
+    // Tracking (Added for Phase 7 Player)
+    // ========================================================================
+
+    /**
+     * Track user progress directly via Journey/Step ID
+     * (Usado por useStepProgress cuando no se tiene el enrollmentId a mano)
+     */
+    trackProgress(payload: TrackProgressPayload): Promise<void> {
+      return client.post<void>('/tracking/progress', payload);
     },
 
     // ========================================================================

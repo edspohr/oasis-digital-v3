@@ -3,24 +3,46 @@
  */
 
 export type JourneyStatus = 'draft' | 'active' | 'archived' | 'completed';
-
 export type StepType = 'content' | 'quiz' | 'task' | 'typeform' | 'video' | 'link';
-
 export type EnrollmentStatus = 'enrolled' | 'in_progress' | 'completed' | 'dropped';
 
 /**
- * Journey entity
+ * Payload para el tracking de progreso
+ * Requerido para: useStepProgress.ts y journey.api.ts
  */
-export interface Journey {
+export interface TrackProgressPayload {
+  journey_id: string;
+  step_id: string;
+  status: 'completed' | 'in_progress';
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Step content varies by type
+ */
+export interface StepContent {
+  body?: string;
+  video_url?: string;
+  quiz_id?: string;
+  form_id?: string;
+  link_url?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Journey step
+ */
+export interface JourneyStep {
   id: string;
-  organization_id: string;
+  journey_id: string;
   title: string;
   description: string | null;
-  cover_image_url: string | null;
-  status: JourneyStatus;
-  settings: JourneySettings;
-  total_steps: number;
-  total_points: number;
+  type: StepType;
+  order: number;
+  points: number;
+  content: StepContent;
+  is_required: boolean;
+  duration_minutes?: number;
   created_at: string;
   updated_at: string;
 }
@@ -39,57 +61,28 @@ export interface JourneySettings {
 }
 
 /**
- * Journey step
+ * Journey entity
  */
-export interface JourneyStep {
+export interface Journey {
   id: string;
-  journey_id: string;
+  organization_id: string;
   title: string;
   description: string | null;
-  type: StepType;
-  order: number;
-  points: number;
-  content: StepContent;
-  is_required: boolean;
+  cover_image_url: string | null;
+  status: JourneyStatus;
+  settings: JourneySettings;
+  
+  // Array de pasos opcional (para cuando se carga el detalle completo)
+  steps?: JourneyStep[];
+  
+  total_steps: number;
+  total_points: number;
   created_at: string;
   updated_at: string;
 }
 
 /**
- * Step content varies by type
- */
-export interface StepContent {
-  // For content type
-  body?: string;
-  // For quiz type
-  questions?: QuizQuestion[];
-  // For typeform type
-  typeform_id?: string;
-  typeform_url?: string;
-  // For video type
-  video_url?: string;
-  video_provider?: 'youtube' | 'vimeo' | 'custom';
-  // For link type
-  url?: string;
-  // For task type
-  instructions?: string;
-  submission_type?: 'text' | 'file' | 'link';
-  [key: string]: unknown;
-}
-
-/**
- * Quiz question
- */
-export interface QuizQuestion {
-  id: string;
-  question: string;
-  options: string[];
-  correct_answer: number;
-  explanation?: string;
-}
-
-/**
- * User enrollment in a journey
+ * Enrollment record
  */
 export interface Enrollment {
   id: string;
@@ -159,14 +152,4 @@ export interface LeaderboardEntry {
   full_name: string;
   avatar_url: string | null;
   points: number;
-  level: number;
-  badges_count: number;
-}
-
-/**
- * Journey with enrollment status for current user
- */
-export interface JourneyWithEnrollment extends Journey {
-  enrollment?: Enrollment;
-  isEnrolled: boolean;
 }
