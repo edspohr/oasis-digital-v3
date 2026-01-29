@@ -1,21 +1,20 @@
-import { SupersetChart } from "@/frontend/components/admin/SupersetChart";
+import { Metadata } from "next";
+import { AdminDashboard } from "@/features/admin/components/AdminDashboard";
+import { RoleGuard } from "@/shared/components/guards/RoleGuard";
 
-export default function AdminDashboard() {
-    // Obtenemos el ID desde las variables de entorno
-    const dashboardId = process.env.NEXT_PUBLIC_SUPERSET_DASHBOARD_ID || "";
+export const metadata: Metadata = {
+  title: "Admin Dashboard | OASIS Platform",
+  description: "Centro de control y administración.",
+};
 
-    return (
-        <div className="space-y-6">
-            <h1 className="font-heading text-3xl font-bold text-gray-800">Panel de Control</h1>
-             <p className="text-gray-600">Gestión de impacto global y eventos.</p>
-   
-             {dashboardId ? (
-                <SupersetChart dashboardId={dashboardId} />
-             ) : (
-                <div className="p-8 border-2 border-dashed rounded-2xl text-center text-gray-400">
-                    Configuración de Dashboard pendiente (ID no encontrado)
-                </div>
-             )}
-        </div>
-    );
+export default function AdminPage() {
+  return (
+    // Protegemos la ruta para que solo 'owner' o 'admin' puedan verla.
+    // (RoleGuard debe manejar la redirección si falla)
+    <RoleGuard allowedRoles={['owner', 'admin']}>
+      <div className="flex-1 space-y-4 p-8 pt-6">
+        <AdminDashboard />
+      </div>
+    </RoleGuard>
+  );
 }
