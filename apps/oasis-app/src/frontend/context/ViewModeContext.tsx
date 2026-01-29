@@ -1,108 +1,65 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import { useAuth } from "@/features/auth/hooks/useAuth";
-import { toast } from "sonner";
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { usePathname } from 'next/navigation';
 
-export type ViewMode = "management" | "participant";
+export type ViewMode = 'participant' | 'management';
 
 interface ViewModeContextType {
   viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
   isStaff: boolean;
   toggleViewMode: () => void;
-  isLoading: boolean;
 }
 
 const ViewModeContext = createContext<ViewModeContextType | undefined>(undefined);
 
-// Definición centralizada de roles con permisos de gestión
-const STAFF_ROLES = ["owner", "admin", "facilitador", "facilitator"];
-const STORAGE_KEY = "oasis_view_mode_preference";
-
 export function ViewModeProvider({ children }: { children: React.ReactNode }) {
   const { profile, isLoading: authLoading } = useAuth();
-  const [viewMode, setViewMode] = useState<ViewMode>("participant");
-  const [isInitialized, setIsInitialized] = useState(false);
-  
-  const router = useRouter();
+  const [viewMode, setViewMode] = useState<ViewMode>('participant');
   const pathname = usePathname();
 
-  // Determinación segura del rol
-  const userRole = (profile as any)?.role || "";
-  const isPlatformAdmin = (profile as any)?.is_platform_admin || false;
-  const isStaff = STAFF_ROLES.includes(userRole) || isPlatformAdmin;
+  // Determinar si es staff (Admin, Owner, Facilitador o Platform Admin)
+  const isStaff = React.useMemo(() => {
+    if (!profile) return false;
+    if (profile.is_platform_admin) return true;
+    const role = (profile as any).role; // Si el rol viene en el perfil plano
+    return ['owner', 'admin', 'facilitador', 'facilitator'].includes(role);
+  }, [profile]);
 
   useEffect(() => {
-    // 1. Bloqueo hasta que la autenticación termine
-    if (authLoading) return;
+    if (authLoading) return; // Esperar a que auth termine
 
-    // 2. Si no es staff, forzamos modo participante y marcamos como inicializado
-    if (!isStaff) {
-      setViewMode("participant");
-      setIsInitialized(true);
-      return;
-    }
-
-    // 3. Lógica de recuperación de estado para Staff
-    const savedMode = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) as ViewMode : null;
-    
-    // CASO CRÍTICO: Si el usuario navega directamente a una URL de admin, 
-    // forzamos el modo management para evitar inconsistencia visual.
+    // 1. Sincronizar URL con Modo
     if (pathname?.startsWith('/admin') || pathname?.startsWith('/facilitator')) {
-       setViewMode("management");
-    } 
-    // Si tiene una preferencia guardada válida
-    else if (savedMode && (savedMode === "management" || savedMode === "participant")) {
-      setViewMode(savedMode);
-    } 
-    // Default para staff: Gestión
-    else {
-      setViewMode("management");
+      if (viewMode !== 'management') setViewMode('management');
+    } else if (pathname?.startsWith('/participant')) {
+      if (viewMode !== 'participant') setViewMode('participant');
     }
     
-    setIsInitialized(true);
-  }, [profile, isStaff, authLoading, pathname]);
+    // 2. Si es Staff y entra a la raíz, por defecto management
+    if (isStaff && pathname === '/') {
+        // Dejamos que page.tsx redirija, no forzamos estado aquí todavía
+    }
+
+  }, [pathname, isStaff, authLoading, viewMode]);
 
   const toggleViewMode = () => {
     if (!isStaff) return;
-
-    const newMode = viewMode === "management" ? "participant" : "management";
-    
-    // Actualizar estado y persistencia
+    const newMode = viewMode === 'management' ? 'participant' : 'management';
     setViewMode(newMode);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, newMode);
-    }
-
-    toast.info(`Cambiando a vista de ${newMode === "management" ? "Gestión" : "Participante"}`);
-
-    // Redirección inteligente basada en el rol
-    if (newMode === "management") {
-      const targetPath = userRole === "facilitador" || userRole === "facilitator" 
-        ? "/facilitator" 
-        : "/admin";
-      router.push(targetPath);
+    
+    // Redirección opcional al cambiar modo
+    if (newMode === 'management') {
+      window.location.href = '/admin';
     } else {
-      router.push("/participant");
+      window.location.href = '/participant';
     }
   };
 
-  // Prevenimos renderizado de hijos hasta determinar el modo correcto
-  // Esto soluciona el "parpadeo" de UI incorrecta
-  if (authLoading || !isInitialized) {
-    return null; // O un componente <LoadingSpinner /> global
-  }
-
   return (
-    <ViewModeContext.Provider
-      value={{
-        viewMode,
-        isStaff,
-        toggleViewMode,
-        isLoading: !isInitialized,
-      }}
-    >
+    <ViewModeContext.Provider value={{ viewMode, setViewMode, isStaff, toggleViewMode }}>
       {children}
     </ViewModeContext.Provider>
   );
@@ -111,7 +68,7 @@ export function ViewModeProvider({ children }: { children: React.ReactNode }) {
 export function useViewMode() {
   const context = useContext(ViewModeContext);
   if (context === undefined) {
-    throw new Error("useViewMode must be used within a ViewModeProvider");
+    throw new Error('useViewMode must be used within a ViewModeProvider');
   }
   return context;
 }
