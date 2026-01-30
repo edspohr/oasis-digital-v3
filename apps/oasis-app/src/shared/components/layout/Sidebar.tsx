@@ -9,9 +9,10 @@ import { ScrollArea } from "@/shared/components/ui/scroll-area";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useViewMode } from "@/frontend/context/ViewModeContext";
 import { ViewModeSwitcher } from "@/frontend/components/layout/ViewModeSwitcher";
-import { 
+import {
   LayoutDashboard, Users, Settings, Map, LogOut, ShieldAlert,
-  GraduationCap, Calendar, Database, ChevronLeft, ChevronRight
+  GraduationCap, Calendar, Database, ChevronLeft, ChevronRight,
+  Trophy, Building2
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,10 +27,16 @@ const adminRoutes: SidebarItem[] = [
   { title: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { title: "Journeys", href: "/admin/journeys", icon: Map },
   { title: "Usuarios", href: "/admin/participants", icon: Users },
+  { title: "Gamificación", href: "/admin/gamification", icon: Trophy },
   { title: "CRM", href: "/admin/crm", icon: Database },
   { title: "Recursos", href: "/admin/resources", icon: GraduationCap },
   { title: "Eventos", href: "/admin/events", icon: Calendar },
   { title: "Configuración", href: "/settings", icon: Settings },
+];
+
+const backofficeRoutes: SidebarItem[] = [
+  { title: "Backoffice", href: "/backoffice", icon: ShieldAlert },
+  { title: "Organizaciones", href: "/backoffice/organizations", icon: Building2 },
 ];
 
 const participantRoutes: SidebarItem[] = [
@@ -68,6 +75,7 @@ export function Sidebar() {
 
   // Selección dinámica de items basada en ViewModeContext
   let items: SidebarItem[] = [];
+  const isPlatformAdmin = profile?.is_platform_admin === true;
 
   if (!isLoading && profile) {
     if (viewMode === 'participant') {
@@ -81,6 +89,11 @@ export function Sidebar() {
       } else {
         // owner, admin, o platform_admin ven rutas de admin
         items = adminRoutes;
+      }
+
+      // Platform admins también ven las rutas de backoffice
+      if (isPlatformAdmin) {
+        items = [...items, ...backofficeRoutes];
       }
     }
   }

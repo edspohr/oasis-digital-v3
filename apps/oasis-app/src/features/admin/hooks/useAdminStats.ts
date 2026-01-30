@@ -32,7 +32,7 @@ export function useAdminStats() {
           setStats([
             { label: 'Total Organizaciones', value: 45, change: 12, trend: 'up', icon: 'building' },
             { label: 'Usuarios Globales', value: '12.5k', change: 8, trend: 'up', icon: 'users' },
-            { label: 'Ingresos MRR', value: '$45k', change: 15, trend: 'up', icon: 'credit-card' },
+            { label: 'Journeys Activos', value: 328, change: 15, trend: 'up', icon: 'activity' },
             { label: 'Tasa de Error', value: '0.2%', change: -0.1, trend: 'down', icon: 'activity' },
           ]);
         } else if (role === 'owner' || role === 'admin') {

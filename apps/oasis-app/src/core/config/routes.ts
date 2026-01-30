@@ -14,6 +14,7 @@ import {
   Shield,
   BookOpen,
   Trophy,
+  Award,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -94,6 +95,20 @@ export const ADMIN_NAV: NavItem[] = [
         href: '/admin/gamification',
         icon: Trophy,
         minRole: 'admin',
+        children: [
+          {
+            label: 'Niveles',
+            href: '/admin/gamification/levels',
+            icon: Trophy,
+            minRole: 'admin',
+          },
+          {
+            label: 'Badges',
+            href: '/admin/gamification/badges',
+            icon: Award,
+            minRole: 'admin',
+          },
+        ],
       },
     ],
   },
@@ -171,6 +186,8 @@ export const PROTECTED_ROUTES: RouteConfig[] = [
   { path: '/admin/participants', minRole: 'facilitador' },
   { path: '/admin/analytics', minRole: 'admin' },
   { path: '/admin/gamification', minRole: 'admin' },
+  { path: '/admin/gamification/levels', minRole: 'admin' },
+  { path: '/admin/gamification/badges', minRole: 'admin' },
 
   // Settings routes
   { path: '/settings/team', minRole: 'admin' },
