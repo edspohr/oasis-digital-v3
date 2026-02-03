@@ -1,18 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Plus,
   Search,
   Edit,
   Trash2,
-  Eye,
   MoreHorizontal,
-  Map,
-  Users,
+  Map as MapIcon,
   Layers,
   ToggleLeft,
   ToggleRight,
+  Loader2,
 } from "lucide-react";
 import { Input } from "@/shared/components/ui/input";
 import { Button } from "@/shared/components/ui/button";
@@ -49,24 +48,11 @@ import {
 import { Label } from "@/shared/components/ui/label";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { Card, CardContent } from "@/shared/components/ui/card";
-import { createClient } from "@/backend/supabase/client";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useApi } from "@/core/hooks/useApi";
 import { toast } from "sonner";
-
-interface Journey {
-  id: string;
-  organization_id: string;
-  title: string;
-  slug: string;
-  description: string | null;
-  thumbnail_url: string | null;
-  is_active: boolean;
-  metadata: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-  steps_count?: number;
-  enrollments_count?: number;
-}
+import type { Journey, JourneyStatus } from "@/core/types";
+import { createClient } from "@/backend/supabase/client";
 
 interface JourneyFormData {
   title: string;
@@ -96,49 +82,28 @@ export default function AdminJourneysPage() {
   const [formData, setFormData] = useState<JourneyFormData>(initialFormData);
   const [isSaving, setIsSaving] = useState(false);
 
-  const supabase = createClient();
   const { currentOrg } = useAuth();
+  const api = useApi();
 
-  useEffect(() => {
-    if (currentOrg?.data.id) {
-      loadJourneys();
-    }
-  }, [currentOrg?.data.id]);
-
-  const loadJourneys = async () => {
-    if (!currentOrg?.data.id) return;
-
+  const loadJourneys = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Get journeys with counts (tables are in 'journeys' schema)
-      const { data: journeysData, error } = await supabase
-        .schema("journeys")
-        .from("journeys")
-        .select(`
-          *,
-          steps:steps(count),
-          enrollments:enrollments(count)
-        `)
-        .eq("organization_id", currentOrg.data.id)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
-      // Transform data to include counts
-      const transformedJourneys = (journeysData || []).map((j: any) => ({
-        ...j,
-        steps_count: j.steps?.[0]?.count || 0,
-        enrollments_count: j.enrollments?.[0]?.count || 0,
-      }));
-
-      setJourneys(transformedJourneys);
-    } catch (error) {
+      const response = await api.journey.getJourneys();
+      // El API devuelve PaginatedResponse<Journey>, accedemos a .data
+      setJourneys(response.data || []);
+    } catch (error: unknown) {
       console.error("Error loading journeys:", error);
       toast.error("Error al cargar journeys");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [api]);
+
+  useEffect(() => {
+    if (currentOrg) {
+      loadJourneys();
+    }
+  }, [currentOrg, loadJourneys]);
 
   const generateSlug = (title: string) => {
     return title
@@ -158,37 +123,38 @@ export default function AdminJourneysPage() {
   };
 
   const handleCreate = async () => {
-    if (!formData.title || !formData.slug || !currentOrg?.data.id) {
+    if (!formData.title) {
       toast.error("Por favor completa los campos requeridos");
       return;
     }
 
     setIsSaving(true);
     try {
-      const { error } = await supabase.schema("journeys").from("journeys").insert({
-        organization_id: currentOrg.data.id,
+      // 1. Crear el journey
+      const newJourney = await api.journey.createJourney({
         title: formData.title,
-        slug: formData.slug,
-        description: formData.description || null,
-        is_active: formData.is_active,
+        description: formData.description,
+        // Nota: slug manual no es soportado por el API endpoint CreateJourneyRequest estándar
+        // Se asume generación automática backend.
       });
 
-      if (error) {
-        if (error.code === "23505") {
-          toast.error("Ya existe un journey con ese slug");
-        } else {
-          throw error;
-        }
-        return;
+      // 2. Si se requiere estado específico y difiere del default (draft)
+      if (formData.is_active && newJourney.status !== 'active') {
+        await api.journey.publishJourney(newJourney.id);
+      } else if (!formData.is_active && newJourney.status === 'active') {
+          // Si por defecto fuera active y queremos draft
+         await api.journey.updateJourney(newJourney.id, { status: 'draft' });
       }
 
       toast.success("Journey creado exitosamente");
       setIsCreateOpen(false);
       setFormData(initialFormData);
       await loadJourneys();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error creating journey:", error);
-      toast.error("Error al crear journey");
+      let message = "Error al crear journey";
+      if (error instanceof Error) message = error.message;
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }
@@ -202,28 +168,22 @@ export default function AdminJourneysPage() {
 
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .schema("journeys")
-        .from("journeys")
-        .update({
-          title: formData.title,
-          slug: formData.slug,
-          description: formData.description || null,
-          is_active: formData.is_active,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", selectedJourney.id);
-
-      if (error) throw error;
+      await api.journey.updateJourney(selectedJourney.id, {
+        title: formData.title,
+        description: formData.description,
+        status: formData.is_active ? 'active' : 'draft',
+      });
 
       toast.success("Journey actualizado exitosamente");
       setIsEditOpen(false);
       setSelectedJourney(null);
       setFormData(initialFormData);
       await loadJourneys();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error updating journey:", error);
-      toast.error("Error al actualizar journey");
+      let message = "Error al actualizar journey";
+      if (error instanceof Error) message = error.message;
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }
@@ -234,21 +194,17 @@ export default function AdminJourneysPage() {
 
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .schema("journeys")
-        .from("journeys")
-        .delete()
-        .eq("id", selectedJourney.id);
-
-      if (error) throw error;
-
+      await api.journey.deleteJourney(selectedJourney.id);
+      
       toast.success("Journey eliminado exitosamente");
       setIsDeleteOpen(false);
       setSelectedJourney(null);
       await loadJourneys();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error deleting journey:", error);
-      toast.error("Error al eliminar journey");
+      let message = "Error al eliminar journey";
+      if (error instanceof Error) message = error.message;
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }
@@ -256,19 +212,20 @@ export default function AdminJourneysPage() {
 
   const toggleActive = async (journey: Journey) => {
     try {
-      const { error } = await supabase
-        .schema("journeys")
-        .from("journeys")
-        .update({ is_active: !journey.is_active, updated_at: new Date().toISOString() })
-        .eq("id", journey.id);
+      const newStatus: JourneyStatus = journey.status === 'active' ? 'draft' : 'active';
+      if (newStatus === 'active') {
+         await api.journey.publishJourney(journey.id);
+      } else {
+         await api.journey.updateJourney(journey.id, { status: 'draft' });
+      }
 
-      if (error) throw error;
-
-      toast.success(journey.is_active ? "Journey desactivado" : "Journey activado");
+      toast.success(newStatus === 'active' ? "Journey activado" : "Journey desactivado");
       await loadJourneys();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error toggling journey:", error);
-      toast.error("Error al cambiar estado");
+      let message = "Error al cambiar estado";
+      if (error instanceof Error) message = error.message;
+      toast.error(message);
     }
   };
 
@@ -276,9 +233,9 @@ export default function AdminJourneysPage() {
     setSelectedJourney(journey);
     setFormData({
       title: journey.title,
-      slug: journey.slug,
+      slug: '', // Slug no disponible en tipo Journey por defecto, dejar vacío o extender tipo si backend lo envía
       description: journey.description || "",
-      is_active: journey.is_active,
+      is_active: journey.status === 'active',
     });
     setIsEditOpen(true);
   };
@@ -290,24 +247,107 @@ export default function AdminJourneysPage() {
 
   const filteredJourneys = journeys.filter((journey) => {
     const matchesSearch =
-      journey.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      journey.slug.toLowerCase().includes(searchTerm.toLowerCase());
+      journey.title.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus =
       filterStatus === "all" ||
-      (filterStatus === "active" && journey.is_active) ||
-      (filterStatus === "inactive" && !journey.is_active);
+      (filterStatus === "active" && journey.status === 'active') ||
+      (filterStatus === "inactive" && journey.status !== 'active');
     return matchesSearch && matchesStatus;
   });
 
   const stats = {
     total: journeys.length,
-    active: journeys.filter((j) => j.is_active).length,
-    totalEnrollments: journeys.reduce((acc, j) => acc + (j.enrollments_count || 0), 0),
-    totalSteps: journeys.reduce((acc, j) => acc + (j.steps_count || 0), 0),
+    active: journeys.filter((j) => j.status === 'active').length,
+    // totalEnrollments: journeys.reduce((acc, j) => acc + (j.enrollments_count || 0), 0), // No disponible en API listado simple
+    totalSteps: journeys.reduce((acc, j) => acc + (j.total_steps || 0), 0),
+  };
+
+  // DEBUG: Test API Connection
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [debugResult, setDebugResult] = useState<any>(null);
+  
+  const testConnection = async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const results: any = {};
+    setIsLoading(true);
+    try {
+      // 1. Manually get Token
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      results.auth = {
+        hasToken: !!token,
+        tokenPrefix: token ? token.substring(0, 15) + "..." : "NONE",
+      };
+
+      // 2. Resolve Org ID
+      let orgId = null;
+      if (currentOrg) {
+         if ('data' in currentOrg) orgId = (currentOrg as unknown as { data: { id: string } }).data.id;
+         else if ('id' in currentOrg) orgId = (currentOrg as unknown as { id: string }).id;
+      }
+      results.org = {
+        hasOrg: !!currentOrg,
+        resolvedId: orgId || "NONE"
+      };
+
+      // 3. Manual Fetch to Journeys
+      const url = `${process.env.NEXT_PUBLIC_JOURNEY_SERVICE_URL || 'https://journey-service-dev-667040450291.us-central1.run.app/api/v1'}/journeys/`;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (orgId) headers['X-Organization-ID'] = orgId;
+
+      results.request = { url, headers };
+
+      try {
+        const response = await fetch(url, { headers });
+        const text = await response.text();
+        results.response = {
+            status: response.status,
+            statusText: response.statusText,
+            params: 'page=1&limit=10 (implicit default)',
+            bodyPreview: text.substring(0, 200)
+        };
+      } catch (e: unknown) {
+        results.fetchError = String(e);
+      }
+
+      setDebugResult(results);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setDebugResult({ globalError: message });
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   return (
     <div className="space-y-6">
+      {/* DEBUG PANEL - REMOVE AFTER FIXING */}
+      <Card className="bg-yellow-50 border-yellow-200 mb-6">
+        <CardContent className="pt-6">
+          <h3 className="text-lg font-bold text-yellow-800 mb-2"> Debug Diagnostic Panel v2</h3>
+          <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+            <div>
+              <span className="font-semibold">Org ID:</span> {currentOrg ? ('data' in currentOrg ? (currentOrg as unknown as { data: { id: string } }).data.id : (currentOrg as unknown as { id: string }).id) : 'MISSING'}
+            </div>
+          </div>
+          <div className="flex gap-2">
+             <Button size="sm" variant="outline" onClick={testConnection}>
+               Run Comprehensive Diagnostics
+             </Button>
+          </div>
+          {debugResult && (
+            <div className="mt-4 p-3 bg-black/5 rounded text-xs overflow-auto max-h-60 font-mono">
+              {JSON.stringify(debugResult, null, 2)}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -330,7 +370,7 @@ export default function AdminJourneysPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="bg-blue-100 rounded-lg p-2">
-                <Map className="h-5 w-5 text-blue-600" />
+                <MapIcon className="h-5 w-5 text-blue-600" />
               </div>
               <div>
                 <div className="text-2xl font-bold">{stats.total}</div>
@@ -365,19 +405,7 @@ export default function AdminJourneysPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="bg-orange-100 rounded-lg p-2">
-                <Users className="h-5 w-5 text-orange-600" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold">{stats.totalEnrollments}</div>
-                <div className="text-sm text-gray-500">Inscripciones</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Ocultamos stats de inscripciones por ahora hasta que el API lo soporte en listado */}
       </div>
 
       {/* Filters */}
@@ -409,10 +437,13 @@ export default function AdminJourneysPage() {
       {/* Table */}
       <div className="bg-white rounded-xl border overflow-hidden">
         {isLoading ? (
-          <div className="p-8 text-center text-gray-500">Cargando journeys...</div>
+          <div className="flex items-center justify-center p-12 text-gray-500">
+             <Loader2 className="h-6 w-6 animate-spin mr-2" />
+             Cargando journeys...
+          </div>
         ) : filteredJourneys.length === 0 ? (
           <div className="p-8 text-center">
-            <Map className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <MapIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500">No hay journeys creados</p>
             <Button className="mt-4" onClick={() => setIsCreateOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -424,9 +455,7 @@ export default function AdminJourneysPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Journey</TableHead>
-                <TableHead>Slug</TableHead>
                 <TableHead>Pasos</TableHead>
-                <TableHead>Inscritos</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -437,7 +466,7 @@ export default function AdminJourneysPage() {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div className="bg-primary/10 rounded-lg p-2">
-                        <Map className="h-5 w-5 text-primary" />
+                        <MapIcon className="h-5 w-5 text-primary" />
                       </div>
                       <div>
                         <div className="font-medium text-gray-900">{journey.title}</div>
@@ -449,22 +478,16 @@ export default function AdminJourneysPage() {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <code className="text-sm bg-gray-100 px-2 py-1 rounded">
-                      {journey.slug}
-                    </code>
-                  </TableCell>
-                  <TableCell>{journey.steps_count || 0}</TableCell>
-                  <TableCell>{journey.enrollments_count || 0}</TableCell>
+                  <TableCell>{journey.total_steps || 0}</TableCell>
                   <TableCell>
                     <Badge
                       className={
-                        journey.is_active
+                        journey.status === 'active'
                           ? "bg-green-100 text-green-700"
                           : "bg-gray-100 text-gray-700"
                       }
                     >
-                      {journey.is_active ? "Activo" : "Inactivo"}
+                      {journey.status === 'active' ? "Activo" : "Inactivo"}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
@@ -480,7 +503,7 @@ export default function AdminJourneysPage() {
                           Editar
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => toggleActive(journey)}>
-                          {journey.is_active ? (
+                          {journey.status === 'active' ? (
                             <>
                               <ToggleLeft className="h-4 w-4 mr-2" />
                               Desactivar
@@ -528,18 +551,7 @@ export default function AdminJourneysPage() {
                 placeholder="Ej: Regulacion Emocional"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="slug">Slug (URL)</Label>
-              <Input
-                id="slug"
-                value={formData.slug}
-                onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                placeholder="regulacion-emocional"
-              />
-              <p className="text-xs text-gray-500">
-                Identificador unico para URLs. Se genera automaticamente.
-              </p>
-            </div>
+            {/* Slug input hidden as API handles it */}
             <div className="space-y-2">
               <Label htmlFor="description">Descripcion</Label>
               <Textarea
@@ -566,7 +578,12 @@ export default function AdminJourneysPage() {
               Cancelar
             </Button>
             <Button onClick={handleCreate} disabled={isSaving}>
-              {isSaving ? "Creando..." : "Crear Journey"}
+              {isSaving ? (
+                 <>
+                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                   Creando...
+                 </>
+               ) : "Crear Journey"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -586,14 +603,6 @@ export default function AdminJourneysPage() {
                 id="edit-title"
                 value={formData.title}
                 onChange={(e) => handleTitleChange(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-slug">Slug (URL)</Label>
-              <Input
-                id="edit-slug"
-                value={formData.slug}
-                onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
               />
             </div>
             <div className="space-y-2">

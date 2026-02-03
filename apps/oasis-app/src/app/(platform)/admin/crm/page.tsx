@@ -36,6 +36,7 @@ function CrmDashboardContent() {
     const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
     const [selectedStatus, setSelectedStatus] = useState<string[]>([]); // New
     const [selectedTags, setSelectedTags] = useState<string[]>([]); // New
+    const [selectedRiskLevels, setSelectedRiskLevels] = useState<string[]>([]); // Watchtower
     const [isNewContactOpen, setIsNewContactOpen] = useState(false);
 
     useEffect(() => {
@@ -59,8 +60,9 @@ function CrmDashboardContent() {
         const matchesLevel = selectedLevels.length === 0 || selectedLevels.includes(c.level);
         const matchesStatus = selectedStatus.length === 0 || selectedStatus.includes(c.status);
         const matchesTags = selectedTags.length === 0 || selectedTags.some(tag => c.tags.includes(tag)); // OR logic for tags, can be AND if preferred
+        const matchesRisk = selectedRiskLevels.length === 0 || selectedRiskLevels.includes(c.riskLevel); // Watchtower
 
-        return matchesSearch && matchesLevel && matchesStatus && matchesTags;
+        return matchesSearch && matchesLevel && matchesStatus && matchesTags && matchesRisk;
     });
 
     const handleCreateContact = () => {
@@ -125,12 +127,12 @@ function CrmDashboardContent() {
                 
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className={(selectedLevels.length > 0 || selectedStatus.length > 0 || selectedTags.length > 0) ? "bg-blue-50 border-blue-200 text-blue-600 gap-2" : "gap-2"}>
+                        <Button variant="outline" className={(selectedLevels.length > 0 || selectedStatus.length > 0 || selectedTags.length > 0 || selectedRiskLevels.length > 0) ? "bg-blue-50 border-blue-200 text-blue-600 gap-2" : "gap-2"}>
                             <Filter className="h-4 w-4" />
                             <span>Filtros</span>
-                            {(selectedLevels.length + selectedStatus.length + selectedTags.length) > 0 && (
+                            {(selectedLevels.length + selectedStatus.length + selectedTags.length + selectedRiskLevels.length) > 0 && (
                                 <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-[10px]">
-                                    {selectedLevels.length + selectedStatus.length + selectedTags.length}
+                                    {selectedLevels.length + selectedStatus.length + selectedTags.length + selectedRiskLevels.length}
                                 </Badge>
                             )}
                         </Button>
@@ -196,7 +198,27 @@ function CrmDashboardContent() {
                             </DropdownMenuCheckboxItem>
                         ))}
 
-                        {(selectedLevels.length > 0 || selectedStatus.length > 0 || selectedTags.length > 0) && (
+                        {/* Filtro: Nivel de Riesgo (Watchtower) */}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>Nivel de Riesgo</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {(['alto', 'medio', 'bajo'] as const).map((risk) => (
+                            <DropdownMenuCheckboxItem
+                                key={risk}
+                                checked={selectedRiskLevels.includes(risk)}
+                                onCheckedChange={(checked) => {
+                                    if (checked) {
+                                        setSelectedRiskLevels([...selectedRiskLevels, risk]);
+                                    } else {
+                                        setSelectedRiskLevels(selectedRiskLevels.filter((r) => r !== risk));
+                                    }
+                                }}
+                            >
+                                {risk === 'alto' ? '🔴 Alto' : risk === 'medio' ? '🟡 Medio' : '🟢 Bajo'}
+                            </DropdownMenuCheckboxItem>
+                        ))}
+
+                        {(selectedLevels.length > 0 || selectedStatus.length > 0 || selectedTags.length > 0 || selectedRiskLevels.length > 0) && (
                             <>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem 
@@ -205,6 +227,7 @@ function CrmDashboardContent() {
                                         setSelectedLevels([]);
                                         setSelectedStatus([]);
                                         setSelectedTags([]);
+                                        setSelectedRiskLevels([]);
                                     }}
                                 >
                                     Limpiar Todos

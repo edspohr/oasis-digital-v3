@@ -3,7 +3,6 @@
  */
 
 import type {
-  ApiResponse,
   ApiError,
   RequestOptions,
   HttpMethod,
@@ -29,11 +28,23 @@ export class ApiClientError extends Error {
   }
 
   static fromResponse(status: number, body: unknown): ApiClientError {
-    const error = body as Partial<ApiError>;
+    let message = `Request failed with status ${status}`;
+    let code: string | undefined;
+    let details: Record<string, unknown> | undefined;
+
+    if (typeof body === 'string') {
+      message = body; // Usually HTML or plain text error
+    } else if (typeof body === 'object' && body !== null) {
+      const error = body as Partial<ApiError>;
+      message = error.message || message;
+      code = error.code;
+      details = error.details;
+    }
+
     return new ApiClientError({
-      message: error.message || `Request failed with status ${status}`,
-      code: error.code,
-      details: error.details,
+      message,
+      code,
+      details,
       status,
     });
   }
@@ -71,7 +82,12 @@ export function createApiClient(config: ApiClientConfig) {
     path: string,
     params?: Record<string, string | number | boolean | undefined>
   ): string {
-    const url = new URL(path, baseUrl);
+    // Ensure baseUrl ends with '/'
+    const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    // Remove leading '/' from path
+    const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
+    
+    const url = new URL(normalizedPath, normalizedBase);
 
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -125,8 +141,36 @@ export function createApiClient(config: ApiClientConfig) {
       requestTimeout || timeout
     );
 
+    const finalUrl = buildUrl(path, params);
+    
+    // DEBUG LOGGING
+    console.log('API Request:', {
+      method,
+      url: finalUrl,
+      headers,
+      body,
+    });
+
     try {
-      const response = await fetch(buildUrl(path, params), {
+      // MOCK DATA INTERCEPTION
+      if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true') {
+        const { mockHandler } = await import('./mockData');
+        
+        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate latency
+
+        if (method === 'GET') {
+           const result = await mockHandler.get(path, params);
+           if (result) return result as T;
+        } else if (method === 'POST') {
+           const result = await mockHandler.post(path, body);
+           if (result) return result as T;
+        }
+        // Fallback to real API if mock doesn't handle it, or throw?
+        // For now, let's log warning and continue or throw
+        console.warn(`[MOCK API] No mock handler for ${method} ${path}`);
+      }
+
+      const response = await fetch(finalUrl, {
         method,
         headers,
         body: body ? JSON.stringify(body) : undefined,

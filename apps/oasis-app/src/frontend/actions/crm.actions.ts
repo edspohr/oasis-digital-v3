@@ -24,6 +24,11 @@ export interface Contact {
   xp: number;
   status: 'active' | 'inactive' | 'lead';
   lastSeen?: string;
+  // Participant Watchtower Fields
+  cohort?: string; // e.g., "Taller PAP - Nov 2024"
+  riskLevel: 'bajo' | 'medio' | 'alto';
+  progress: number; // 0-100 (% completion of journey)
+  certificationStatus: 'pendiente' | 'emitido' | 'expirado' | 'no_aplica';
 }
 
 export interface Workshop {
@@ -49,6 +54,7 @@ const seedData = () => {
         const lastNames = ["Pérez", "Díaz", "Lagos", "Silva", "Rojas", "González", "Muñoz", "Castro", "Vargas", "Torres", "Fernandez", "Ramirez", "Soto", "Contreras", "Rodriguez", "Morales", "Herrera", "Sepulveda", "Fuentes", "Mendoza"];
         const organizations = ["TechCorp", "Fundación Educa", "Bankia", "Minera Andes", "Retail Global", "Salud Plus", "Constructora Viga", "AgroChile", "Innovación SpA", "Consultora Beta", "Fundación Summer", "Colegio San Juan", "Hospital Central"];
         const tagsList = ["vip", "donante", "taller-verano", "newsletter", "interesado-taller", "baja-interaccion", "nuevo-ingreso", "voluntario"];
+        const cohorts = ["Taller PAP - Nov 2024", "Taller PAP - Oct 2024", "Programa Vigilancia Q4", "Taller PAP - Sep 2024", null];
 
         const generateContacts = (count: number): Contact[] => {
             return Array.from({ length: count }).map(() => {
@@ -62,6 +68,12 @@ const seedData = () => {
                 let status: Contact['status'] = 'lead';
                 if (score > 80) { level = 'Embajador'; status = 'active'; }
                 else if (score > 40) { level = 'Activo'; status = 'active'; }
+
+                // Watchtower fields
+                const progress = Math.floor(Math.random() * 101);
+                const riskLevel = score < 40 ? 'alto' : score < 70 ? 'medio' : 'bajo';
+                const certStatus = progress >= 100 ? 'emitido' : progress > 0 ? 'pendiente' : 'no_aplica';
+                const cohort = cohorts[Math.floor(Math.random() * cohorts.length)];
 
                 return {
                     id: uuidv4(),
@@ -80,7 +92,12 @@ const seedData = () => {
                     level,
                     xp: Math.floor(score * 15 + Math.random() * 500),
                     status,
-                    lastSeen: new Date(Date.now() - Math.floor(Math.random() * 100000000)).toISOString()
+                    lastSeen: new Date(Date.now() - Math.floor(Math.random() * 100000000)).toISOString(),
+                    // Watchtower
+                    cohort: cohort || undefined,
+                    riskLevel: riskLevel as Contact['riskLevel'],
+                    progress,
+                    certificationStatus: certStatus as Contact['certificationStatus'],
                 };
             });
         };
@@ -103,7 +120,12 @@ const seedData = () => {
                 level: 'Embajador',
                 xp: 1250,
                 status: 'active',
-                lastSeen: new Date().toISOString()
+                lastSeen: new Date().toISOString(),
+                // Watchtower
+                cohort: 'Taller PAP - Nov 2024',
+                riskLevel: 'bajo',
+                progress: 100,
+                certificationStatus: 'emitido',
             });
         }
 

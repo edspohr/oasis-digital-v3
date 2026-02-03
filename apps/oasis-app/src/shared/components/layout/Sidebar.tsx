@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/shared/lib/utils";
@@ -11,8 +11,8 @@ import { useViewMode } from "@/frontend/context/ViewModeContext";
 import { ViewModeSwitcher } from "@/frontend/components/layout/ViewModeSwitcher";
 import {
   LayoutDashboard, Users, Settings, Map, LogOut, ShieldAlert,
-  GraduationCap, Calendar, Database, ChevronLeft, ChevronRight,
-  Trophy, Building2
+  GraduationCap, Calendar, ChevronLeft, ChevronRight,
+  Building2, BarChart3
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,15 +23,13 @@ interface SidebarItem {
   icon: React.ElementType;
 }
 
+// Admin: Máximo 5 items principales + configuración en footer
 const adminRoutes: SidebarItem[] = [
   { title: "Dashboard", href: "/admin", icon: LayoutDashboard },
-  { title: "Journeys", href: "/admin/journeys", icon: Map },
-  { title: "Usuarios", href: "/admin/participants", icon: Users },
-  { title: "Gamificación", href: "/admin/gamification", icon: Trophy },
-  { title: "CRM", href: "/admin/crm", icon: Database },
+  { title: "CRM", href: "/admin/crm", icon: Users },           // CRM + Gamificación unificados
+  { title: "Eventos", href: "/admin/events", icon: Calendar },           // Eventos & Journeys se ven aquí
+  { title: "Analítica", href: "/admin/analytics", icon: BarChart3 },     // NUEVO: Superset
   { title: "Recursos", href: "/admin/resources", icon: GraduationCap },
-  { title: "Eventos", href: "/admin/events", icon: Calendar },
-  { title: "Configuración", href: "/settings", icon: Settings },
 ];
 
 const backofficeRoutes: SidebarItem[] = [
@@ -172,6 +170,25 @@ export function Sidebar() {
         <div className="mt-auto px-3 pb-4 space-y-2">
           {/* Switcher recibe el estado collapsed */}
           <ViewModeSwitcher collapsed={isCollapsed} />
+          
+          {/* Settings Link */}
+          <Link
+            href="/settings"
+            className={cn(
+              "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
+              pathname === "/settings" ? "bg-accent/80 text-accent-foreground shadow-sm" : "transparent",
+              isCollapsed ? "justify-center" : "justify-start"
+            )}
+            title={isCollapsed ? "Configuración" : ""}
+          >
+            <Settings className="h-5 w-5 shrink-0" />
+            <span className={cn(
+              "transition-all duration-300 whitespace-nowrap",
+              isCollapsed ? "opacity-0 w-0 hidden" : "opacity-100 w-auto"
+            )}>
+              Configuración
+            </span>
+          </Link>
           
           <Button 
             variant="ghost" 

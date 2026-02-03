@@ -50,7 +50,7 @@ export interface CreateStepRequest {
   is_required?: boolean;
 }
 
-export interface UpdateStepRequest extends Partial<CreateStepRequest> {}
+export type UpdateStepRequest = Partial<CreateStepRequest>;
 
 export interface EnrollRequest {
   journey_id: string;
@@ -94,7 +94,7 @@ export function createJourneyApi(
      * Get all journeys (filtered by organization)
      */
     getJourneys(filters?: JourneyFilters): Promise<PaginatedResponse<Journey>> {
-      return client.get<PaginatedResponse<Journey>>('/journeys', {
+      return client.get<PaginatedResponse<Journey>>('/journeys/', {
         params: filters as Record<string, string | number | boolean | undefined>,
       });
     },
@@ -103,42 +103,42 @@ export function createJourneyApi(
      * Get journey by ID
      */
     getJourney(journeyId: string): Promise<Journey> {
-      return client.get<Journey>(`/journeys/${journeyId}`);
+      return client.get<Journey>(`/journeys/${journeyId}/`);
     },
 
     /**
      * Create new journey
      */
     createJourney(data: CreateJourneyRequest): Promise<Journey> {
-      return client.post<Journey>('/journeys', data);
+      return client.post<Journey>('/journeys/', data);
     },
 
     /**
      * Update journey
      */
     updateJourney(journeyId: string, data: UpdateJourneyRequest): Promise<Journey> {
-      return client.patch<Journey>(`/journeys/${journeyId}`, data);
+      return client.patch<Journey>(`/journeys/${journeyId}/`, data);
     },
 
     /**
      * Delete journey
      */
     deleteJourney(journeyId: string): Promise<void> {
-      return client.delete<void>(`/journeys/${journeyId}`);
+      return client.delete<void>(`/journeys/${journeyId}/`);
     },
 
     /**
      * Publish journey (change status to active)
      */
     publishJourney(journeyId: string): Promise<Journey> {
-      return client.patch<Journey>(`/journeys/${journeyId}`, { status: 'active' });
+      return client.patch<Journey>(`/journeys/${journeyId}/`, { status: 'active' });
     },
 
     /**
      * Archive journey
      */
     archiveJourney(journeyId: string): Promise<Journey> {
-      return client.patch<Journey>(`/journeys/${journeyId}`, { status: 'archived' });
+      return client.patch<Journey>(`/journeys/${journeyId}/`, { status: 'archived' });
     },
 
     // ========================================================================
@@ -149,21 +149,21 @@ export function createJourneyApi(
      * Get all steps for a journey
      */
     getJourneySteps(journeyId: string): Promise<JourneyStep[]> {
-      return client.get<JourneyStep[]>(`/journeys/${journeyId}/steps`);
+      return client.get<JourneyStep[]>(`/journeys/${journeyId}/steps/`);
     },
 
     /**
      * Get single step
      */
     getStep(journeyId: string, stepId: string): Promise<JourneyStep> {
-      return client.get<JourneyStep>(`/journeys/${journeyId}/steps/${stepId}`);
+      return client.get<JourneyStep>(`/journeys/${journeyId}/steps/${stepId}/`);
     },
 
     /**
      * Create step
      */
     createStep(journeyId: string, data: CreateStepRequest): Promise<JourneyStep> {
-      return client.post<JourneyStep>(`/journeys/${journeyId}/steps`, data);
+      return client.post<JourneyStep>(`/journeys/${journeyId}/steps/`, data);
     },
 
     /**
@@ -174,14 +174,14 @@ export function createJourneyApi(
       stepId: string,
       data: UpdateStepRequest
     ): Promise<JourneyStep> {
-      return client.patch<JourneyStep>(`/journeys/${journeyId}/steps/${stepId}`, data);
+      return client.patch<JourneyStep>(`/journeys/${journeyId}/steps/${stepId}/`, data);
     },
 
     /**
      * Delete step
      */
     deleteStep(journeyId: string, stepId: string): Promise<void> {
-      return client.delete<void>(`/journeys/${journeyId}/steps/${stepId}`);
+      return client.delete<void>(`/journeys/${journeyId}/steps/${stepId}/`);
     },
 
     /**
@@ -191,7 +191,7 @@ export function createJourneyApi(
       journeyId: string,
       stepOrder: string[]
     ): Promise<JourneyStep[]> {
-      return client.patch<JourneyStep[]>(`/journeys/${journeyId}/steps/reorder`, {
+      return client.patch<JourneyStep[]>(`/journeys/${journeyId}/steps/reorder/`, {
         step_order: stepOrder,
       });
     },
@@ -211,21 +211,21 @@ export function createJourneyApi(
      * Get enrollment by ID
      */
     getEnrollment(enrollmentId: string): Promise<EnrollmentWithJourney> {
-      return client.get<EnrollmentWithJourney>(`/enrollments/${enrollmentId}`);
+      return client.get<EnrollmentWithJourney>(`/enrollments/${enrollmentId}/`);
     },
 
     /**
      * Enroll in a journey
      */
     enroll(data: EnrollRequest): Promise<Enrollment> {
-      return client.post<Enrollment>('/enrollments', data);
+      return client.post<Enrollment>('/enrollments/', data);
     },
 
     /**
      * Drop from a journey
      */
     dropEnrollment(enrollmentId: string): Promise<void> {
-      return client.delete<void>(`/enrollments/${enrollmentId}`);
+      return client.delete<void>(`/enrollments/${enrollmentId}/`);
     },
 
     /**
@@ -238,7 +238,7 @@ export function createJourneyApi(
       completions: StepCompletion[];
       steps: JourneyStep[];
     }> {
-      return client.get(`/enrollments/${enrollmentId}/progress`);
+      return client.get(`/enrollments/${enrollmentId}/progress/`);
     },
 
     /**
@@ -250,7 +250,7 @@ export function createJourneyApi(
       data?: CompleteStepRequest
     ): Promise<StepCompletion> {
       return client.post<StepCompletion>(
-        `/enrollments/${enrollmentId}/steps/${stepId}/complete`,
+        `/enrollments/${enrollmentId}/steps/${stepId}/complete/`,
         data
       );
     },
@@ -295,7 +295,7 @@ export function createJourneyApi(
     },
 
     /**
-     * Get all available badges
+     * Get available badges
      */
     getAvailableBadges(): Promise<Badge[]> {
       return client.get<Badge[]>('/badges');
@@ -312,7 +312,7 @@ export function createJourneyApi(
       journeyId: string,
       filters?: PaginationParams
     ): Promise<PaginatedResponse<EnrollmentWithJourney & { user: { id: string; full_name: string; email: string } }>> {
-      return client.get(`/journeys/${journeyId}/enrollments`, {
+      return client.get(`/journeys/${journeyId}/enrollments/`, {
         params: filters as Record<string, string | number | boolean | undefined>,
       });
     },
@@ -321,14 +321,14 @@ export function createJourneyApi(
      * Manually enroll a user (admin)
      */
     enrollUser(journeyId: string, userId: string): Promise<Enrollment> {
-      return client.post<Enrollment>(`/journeys/${journeyId}/enrollments`, { user_id: userId });
+      return client.post<Enrollment>(`/journeys/${journeyId}/enrollments/`, { user_id: userId });
     },
 
     /**
      * Remove user from journey (admin)
      */
     removeUserEnrollment(journeyId: string, enrollmentId: string): Promise<void> {
-      return client.delete<void>(`/journeys/${journeyId}/enrollments/${enrollmentId}`);
+      return client.delete<void>(`/journeys/${journeyId}/enrollments/${enrollmentId}/`);
     },
 
     // ========================================================================

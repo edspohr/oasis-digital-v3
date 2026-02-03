@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Bell, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
@@ -17,20 +17,28 @@ import {
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { OrgSwitcherCompact } from '@/features/organization/components/OrgSwitcher';
 import { getInitials } from '@/shared/lib/formatters';
+import { LevelBadge, type UserLevel } from '@/shared/components/gamification/LevelBadge';
 import Link from 'next/link';
 
 interface HeaderProps {
   className?: string;
   showSearch?: boolean;
   showOrgSwitcher?: boolean;
+  showGamification?: boolean;
 }
 
 export function Header({
   className,
   showSearch = false,
   showOrgSwitcher = true,
+  showGamification = true,
 }: HeaderProps) {
   const { profile, signOut } = useAuth();
+
+  // TODO: Replace with actual gamification data from API/context
+  // For now, use mock data. In production, this would come from profile or a gamification context
+  const userLevel: UserLevel = 'Activo';
+  const userXp = 850;
 
   return (
     <header
@@ -60,13 +68,15 @@ export function Header({
         {/* Org Switcher (compact) */}
         {showOrgSwitcher && <OrgSwitcherCompact />}
 
-        {/* Notifications */}
-        <Button variant="ghost" size="icon" className="relative">
+        {/* Gamification Badge */}
+        {showGamification && profile && (
+          <LevelBadge level={userLevel} xp={userXp} size="sm" />
+        )}
+
+        {/* Notifications - Removed for cleaner UI */}
+        {/* <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
-          <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground flex items-center justify-center">
-            3
-          </span>
-        </Button>
+        </Button> */}
 
         {/* User Menu */}
         {profile && (

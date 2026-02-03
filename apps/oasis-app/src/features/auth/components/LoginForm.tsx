@@ -149,6 +149,81 @@ export function LoginForm() {
     }
   }
 
+  // --- DEV MOCK LOGIN UI ---
+  const isMockMode = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
+
+  if (isMockMode) {
+    const handleDevLogin = (userId: string) => {
+        setIsLoading(true);
+        // Persist choice for mock handler
+        if (typeof window !== 'undefined') {
+            window.localStorage.setItem('MOCK_USER_ID', userId);
+        }
+        // Redirect home to force re-fetch of auth/me
+        setTimeout(() => {
+            window.location.href = "/";
+        }, 500);
+    };
+
+    return (
+      <Card className="w-full max-w-2xl border-amber-200 bg-amber-50/30 shadow-xl">
+        <CardHeader className="space-y-1 text-center">
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
+                <Lock className="h-6 w-6 text-amber-600" />
+            </div>
+          <CardTitle className="text-2xl font-bold text-amber-900">DEV MODE LOGIN</CardTitle>
+          <CardDescription className="text-amber-700/80">
+            Escoge un perfil para simular la sesión (Sin contraseña)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+            
+            <DevProfileCard 
+                title="Super Admin"
+                role="Fundación Summer"
+                desc="Acceso total a la plataforma"
+                icon="👑"
+                color="bg-purple-100 border-purple-200 text-purple-900"
+                onClick={() => handleDevLogin('usr-super-001')}
+            />
+
+            <DevProfileCard 
+                title="Admin Organización"
+                role="Tech Corp"
+                desc="Gestión de Journey y equipo"
+                icon="🏢"
+                color="bg-blue-100 border-blue-200 text-blue-900"
+                onClick={() => handleDevLogin('usr-admin-002')}
+            />
+
+            <DevProfileCard 
+                title="Participante"
+                role="Tech Corp"
+                desc="Usuario final en Journey activo"
+                icon="🚀"
+                color="bg-green-100 border-green-200 text-green-900"
+                onClick={() => handleDevLogin('usr-part-003')}
+            />
+
+            <DevProfileCard 
+                title="Suscriptor"
+                role="Edu Global"
+                desc="Usuario curioso auto-registrado"
+                icon="👀"
+                color="bg-gray-100 border-gray-200 text-gray-900"
+                onClick={() => handleDevLogin('usr-part-004')}
+            />
+
+        </CardContent>
+        <CardFooter className="justify-center border-t border-amber-200 p-4">
+            <p className="text-xs text-amber-600 font-mono">
+                NEXT_PUBLIC_USE_MOCK_DATA=true
+            </p>
+        </CardFooter>
+      </Card>
+    );
+  }
+
   return (
     <Card className="w-full max-w-md border-muted/40 shadow-xl">
       <CardHeader className="space-y-1 text-center">
@@ -244,7 +319,7 @@ export function LoginForm() {
                   Ingresando...
                 </>
               ) : (
-                "Iniciar Sesion"
+                  "Iniciar Sesion"
               )}
             </Button>
           </form>
@@ -260,4 +335,34 @@ export function LoginForm() {
       </CardFooter>
     </Card>
   );
+}
+
+interface DevProfileCardProps {
+    title: string;
+    role: string;
+    desc: string;
+    icon: string;
+    color: string;
+    onClick: () => void;
+}
+
+function DevProfileCard({ title, role, desc, icon, color, onClick }: DevProfileCardProps) {
+    return (
+        <button 
+            type="button"
+            onClick={onClick}
+            className={`flex flex-col items-start p-4 rounded-xl border-2 transition-all hover:scale-[1.02] hover:shadow-md text-left ${color}`}
+        >
+            <div className="flex w-full justify-between items-start mb-2">
+                <span className="text-2xl">{icon}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider opacity-60 bg-white/50 px-2 py-1 rounded">
+                    {role}
+                </span>
+            </div>
+            <div className="font-bold text-lg mb-1">{title}</div>
+            <div className="text-xs opacity-80 leading-tight">
+                {desc}
+            </div>
+        </button>
+    );
 }

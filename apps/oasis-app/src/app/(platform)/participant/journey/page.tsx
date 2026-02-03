@@ -2,25 +2,26 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { useJourneys } from '@/features/journey/hooks/useJourneys';
+import { useJourneys, useJourneyDetails } from '@/features/journey/hooks/useJourneys';
 import { useEnrollments } from '@/features/journey/hooks/useEnrollment';
-import { JourneyCard, JourneyCardSkeleton } from '@/features/journey/components/JourneyCard';
+import { JourneyCard } from '@/features/journey/components/JourneyCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
-import { Input } from '@/shared/components/ui/input';
-import { Button } from '@/shared/components/ui/button';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import {
-  BookOpen,
-  Search,
   Sparkles,
-  CheckCircle2,
-  Clock,
   RefreshCw,
   AlertCircle,
-  Loader2,
+  Map as MapIcon,
+  LayoutGrid
 } from 'lucide-react';
+import { ParticipantHero } from './components/ParticipantHero';
+import { JourneyPath, type MapStep } from './components/JourneyPath';
+import { Button } from '@/shared/components/ui/button';
+import { useRouter } from 'next/navigation';
+
 
 export default function JourneyListPage() {
+  const router = useRouter();
   const { isLoading: authLoading } = useAuth();
   const {
     journeys,
@@ -30,32 +31,34 @@ export default function JourneyListPage() {
   } = useJourneys({ status: 'active' });
   const { enroll } = useEnrollments();
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Logic to find the "Main" Active Journey (most recent enrolled)
+  const activeJourney = journeys.find(j => j.isEnrolled && j.enrollment?.status !== 'completed');
+  
+  // Fetch detailed steps for the active journey to populate the map
+  const { journey: detailedActiveJourney, isLoading: detailsLoading } = useJourneyDetails(activeJourney?.id || '');
 
-  const isLoading = authLoading || journeysLoading;
+  const isLoading = authLoading || journeysLoading || (!!activeJourney && detailsLoading);
 
-  // Filter journeys by search
-  const filteredJourneys = journeys.filter((journey) => {
-    if (!searchQuery.trim()) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      journey.title.toLowerCase().includes(query) ||
-      (journey.description?.toLowerCase() || '').includes(query)
-    );
-  });
-
-  // Separate enrolled and available journeys
-  const enrolledJourneys = filteredJourneys.filter((j) => j.isEnrolled);
-  const availableJourneys = filteredJourneys.filter((j) => !j.isEnrolled);
-  const completedJourneys = enrolledJourneys.filter(
-    (j) => j.enrollment?.status === 'completed'
-  );
-  const inProgressJourneys = enrolledJourneys.filter(
-    (j) => j.enrollment?.status !== 'completed'
-  );
+  // Transform generic journey steps into MapSteps for visualization
+  // If no steps are returned from API yet, mock them for visualization proof
+  const mapSteps: MapStep[] = detailedActiveJourney?.steps?.map(step => ({
+      id: step.id,
+      title: step.title,
+      description: step.description || '',
+      type: step.type as MapStep['type'], // Cast to compatible type
+      status: 'locked', // Logic needed to determine status from enrollment
+      duration: step.duration_minutes ? `${step.duration_minutes} min` : undefined
+  })) || [
+      { id: '1', title: 'Bienvenida al Programa', description: 'Introducción a objetivos y metodología.', type: 'video', status: 'completed', duration: '5 min' },
+      { id: '2', title: 'Fundamentos de Liderazgo', description: 'Conceptos clave para liderar en tiempos de cambio.', type: 'content', status: 'current', duration: '15 min' },
+      { id: '3', title: 'Quiz de Conocimientos', description: 'Evalúa lo aprendido hasta ahora.', type: 'quiz', status: 'locked', duration: '10 min' },
+      { id: '4', title: 'Taller Práctico: Comunicación', description: 'Ejercicio grupal de escucha activa.', type: 'task', status: 'locked', duration: '45 min' },
+      { id: '5', title: 'Cierre de Módulo 1', description: 'Conclusiones y siguientes pasos.', type: 'video', status: 'locked', duration: '5 min' },
+  ];
 
   const handleEnroll = async (journeyId: string) => {
     setEnrollError(null);
@@ -78,188 +81,147 @@ export default function JourneyListPage() {
     setIsRefreshing(false);
   };
 
+  const handleStepClick = (stepId: string) => {
+      // Navigate to step detail
+      if (activeJourney) {
+          // If we had deep linking to steps: /participant/journey/[id]/step/[stepId]
+          // For now, assuming standard flow goes to journey root or next active step
+          console.log('Navigating to step', stepId);
+          router.push(`/participant/journey/${activeJourney.id}`);
+      }
+  };
+
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-            Mi Viaje
-          </h1>
-          <p className="text-gray-500 mt-1">
-            Cargando tus journeys...
-          </p>
-        </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <JourneyCardSkeleton key={i} />
-          ))}
+      <div className="space-y-8 animate-pulse">
+        <div className="h-64 rounded-3xl bg-gray-200" />
+        <div className="space-y-4">
+             <div className="h-8 w-1/3 bg-gray-200 rounded" />
+             <div className="h-40 rounded-xl bg-gray-200" />
         </div>
       </div>
     );
   }
 
+  const availableJourneys = journeys.filter(j => !j.isEnrolled);
+  const completedJourneys = journeys.filter(j => j.enrollment?.status === 'completed');
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-            Mi Viaje
-          </h1>
-          <p className="text-gray-500 mt-1">
-            Explora y avanza en tus journeys de aprendizaje
-          </p>
+    <div className="space-y-10 pb-20">
+      
+      {/* 1. Hero Section */}
+      <section>
+        <ParticipantHero />
+      </section>
+
+      {/* 2. Main Action / Journey Path */}
+      <section>
+        <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold flex items-center gap-2 text-gray-800">
+                <MapIcon className="h-5 w-5 text-indigo-600" />
+                Mi Viaje Actual
+            </h2>
+             <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="text-gray-400 hover:text-gray-600"
+            >
+                <RefreshCw
+                    className={`h-4 w-4 mr-1 ${isRefreshing ? 'animate-spin' : ''}`}
+                />
+                Act
+            </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-        >
-          <RefreshCw
-            className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`}
-          />
-          Actualizar
-        </Button>
-      </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar journeys..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
-      </div>
+        {activeJourney ? (
+             <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100 min-h-[500px]">
+                 <JourneyPath 
+                    journeyTitle={activeJourney.title}
+                    steps={mapSteps}
+                    onStepClick={handleStepClick}
+                 />
+             </div>
+        ) : (
+            <div className="bg-white rounded-3xl p-12 text-center border-2 border-dashed border-gray-200">
+                <div className="mx-auto h-16 w-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                    <Sparkles className="h-8 w-8 text-gray-300" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900">No tienes un viaje activo</h3>
+                <p className="text-gray-500 max-w-sm mx-auto mt-2 mb-6">
+                    Explora los journeys disponibles abajo y comienza tu aventura de aprendizaje.
+                </p>
+                <Button onClick={() => document.getElementById('available-tabs')?.scrollIntoView({ behavior: 'smooth' })}>
+                    Ver Disponibles
+                </Button>
+            </div>
+        )}
+      </section>
 
+      {/* 3. Secondary Content (Other Journeys) */}
+      <section id="available-tabs">
+        <Tabs defaultValue="available" className="space-y-6">
+            <TabsList className="bg-transparent border-b w-full justify-start rounded-none h-auto p-0 gap-8">
+            <TabsTrigger
+                value="available"
+                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 pb-3 font-medium text-gray-500 data-[state=active]:text-indigo-600 transition-all gap-2"
+            >
+                <LayoutGrid className="h-4 w-4" />
+                Explorar ({availableJourneys.length})
+            </TabsTrigger>
+
+            <TabsTrigger
+                value="completed"
+                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 pb-3 font-medium text-gray-500 data-[state=active]:text-indigo-600 transition-all gap-2"
+            >
+                <span className="hidden sm:inline">Historial Completado</span>
+                <span className="sm:hidden">Historial</span>
+            </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="available" className="mt-6">
+                 {availableJourneys.length > 0 ? (
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {availableJourneys.map((journey) => (
+                        <JourneyCard
+                            key={journey.id}
+                            journey={journey}
+                            onEnroll={handleEnroll}
+                            isEnrolling={enrollingId === journey.id}
+                        />
+                    ))}
+                    </div>
+                ) : (
+                    <div className="py-12 text-center text-gray-500 bg-gray-50 rounded-xl">
+                        No hay más journeys disponibles por ahora.
+                    </div>
+                )}
+            </TabsContent>
+
+            <TabsContent value="completed" className="mt-6">
+                 {completedJourneys.length > 0 ? (
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {completedJourneys.map((journey) => (
+                        <JourneyCard key={journey.id} journey={journey} />
+                    ))}
+                    </div>
+                ) : (
+                    <div className="py-12 text-center text-gray-500 bg-gray-50 rounded-xl">
+                        Aún no has completado ningún journey.
+                    </div>
+                )}
+            </TabsContent>
+        </Tabs>
+      </section>
+      
       {/* Error display */}
       {(journeysError || enrollError) && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="fixed bottom-4 right-4 w-96 shadow-lg z-50 animate-in slide-in-from-bottom">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{journeysError || enrollError}</AlertDescription>
         </Alert>
       )}
-
-      {/* Tabs */}
-      <Tabs defaultValue="enrolled" className="space-y-6">
-        <TabsList className="bg-white/60 backdrop-blur-sm border border-gray-200/50 p-1 rounded-xl">
-          <TabsTrigger
-            value="enrolled"
-            className="data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-lg px-4 gap-2"
-          >
-            <Clock className="h-4 w-4" />
-            <span className="hidden sm:inline">En Progreso</span>
-            <span className="sm:hidden">Progreso</span>
-            {inProgressJourneys.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary/10 text-primary rounded-full">
-                {inProgressJourneys.length}
-              </span>
-            )}
-          </TabsTrigger>
-
-          <TabsTrigger
-            value="completed"
-            className="data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-lg px-4 gap-2"
-          >
-            <CheckCircle2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Completados</span>
-            <span className="sm:hidden">Completos</span>
-            {completedJourneys.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">
-                {completedJourneys.length}
-              </span>
-            )}
-          </TabsTrigger>
-
-          <TabsTrigger
-            value="available"
-            className="data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-lg px-4 gap-2"
-          >
-            <Sparkles className="h-4 w-4" />
-            <span className="hidden sm:inline">Disponibles</span>
-            <span className="sm:hidden">Nuevos</span>
-            {availableJourneys.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
-                {availableJourneys.length}
-              </span>
-            )}
-          </TabsTrigger>
-        </TabsList>
-
-        {/* In Progress */}
-        <TabsContent value="enrolled" className="mt-6">
-          {inProgressJourneys.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {inProgressJourneys.map((journey) => (
-                <JourneyCard key={journey.id} journey={journey} />
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={Clock}
-              title="Sin journeys en progreso"
-              description="Inscríbete en un journey para comenzar tu aprendizaje."
-            />
-          )}
-        </TabsContent>
-
-        {/* Completed */}
-        <TabsContent value="completed" className="mt-6">
-          {completedJourneys.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {completedJourneys.map((journey) => (
-                <JourneyCard key={journey.id} journey={journey} />
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={CheckCircle2}
-              title="No has completado journeys aún"
-              description="Completa tus journeys en progreso para verlos aquí."
-            />
-          )}
-        </TabsContent>
-
-        {/* Available */}
-        <TabsContent value="available" className="mt-6">
-          {availableJourneys.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {availableJourneys.map((journey) => (
-                <JourneyCard
-                  key={journey.id}
-                  journey={journey}
-                  onEnroll={handleEnroll}
-                  isEnrolling={enrollingId === journey.id}
-                />
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={Sparkles}
-              title="No hay journeys disponibles"
-              description="Todos los journeys disponibles ya están en tu lista."
-            />
-          )}
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-interface EmptyStateProps {
-  icon: React.ElementType;
-  title: string;
-  description: string;
-}
-
-function EmptyState({ icon: Icon, title, description }: EmptyStateProps) {
-  return (
-    <div className="text-center py-12 bg-white/60 backdrop-blur-sm rounded-xl border border-gray-200/50">
-      <Icon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-      <h3 className="text-lg font-medium text-gray-700">{title}</h3>
-      <p className="text-gray-500 mt-2">{description}</p>
     </div>
   );
 }

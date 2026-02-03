@@ -1,12 +1,8 @@
-'use client';
-
 import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/backend/supabase/client';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { useApi } from '@/core/hooks/useApi';
 import type {
-  Journey,
   JourneyWithEnrollment,
-  Enrollment,
   JourneyStatus,
 } from '@/core/types';
 
@@ -24,12 +20,11 @@ interface UseJourneysOptions {
 }
 
 export function useJourneys(options: UseJourneysOptions = {}): UseJourneysReturn {
-  const { currentOrg, profile } = useAuth();
+  const { currentOrg } = useAuth();
+  const api = useApi();
   const [journeys, setJourneys] = useState<JourneyWithEnrollment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const supabase = createClient();
 
   const fetchJourneys = useCallback(async () => {
     // Corrección para evitar crashes si currentOrg tiene estructura anidada o es null
@@ -47,48 +42,41 @@ export function useJourneys(options: UseJourneysOptions = {}): UseJourneysReturn
       setIsLoading(true);
       setError(null);
 
-      // 1. Fetch Journeys desde el schema 'journeys'
-      let query = supabase
-        .schema('journeys') // <--- CRÍTICO: Apuntar al schema correcto
-        .from('journeys')
-        .select('*')
-        .eq('organization_id', orgId)
-        .order('created_at', { ascending: false });
+      // Usar el servicio de Journey
+      const response = await api.journey.getJourneys({
+        status: options.status,
+      });
 
-      if (options.status) {
-        query = query.eq('status', options.status);
-      }
+      // El servicio ya devuelve la estructura que necesitamos (JourneyWithEnrollment)
+      // debido a cómo están definidos los tipos en el cliente API.
+      // Sin embargo, verificaremos si necesitamos mapear algo.
+      // Nota: El endpoint getJourneys devuelve PaginatedResponse<Journey>, no JourneyWithEnrollment directo.
+      //       Pero el backend suele enriquecer la respuesta si el usuario está autenticado.
+      //       Asumiremos por ahora que debemos verificar enrollments por separado O que el backend los incluye.
+      
+      // REVISIÓN: El cliente `journey.api.ts` dice que devuelve `PaginatedResponse<Journey>`.
+      // Si queremos saber si está "enrolled", necesitamos `getMyEnrollments` también.
+      
+      const [journeysResponse, enrollmentsResponse] = await Promise.all([
+        api.journey.getJourneys({ status: options.status }),
+        api.journey.getMyEnrollments()
+      ]);
 
-      const { data: journeysData, error: journeysError } = await query;
+      const fetchedJourneys = journeysResponse.data;
+      const myEnrollments = enrollmentsResponse; // Array<EnrollmentWithJourney>
 
-      if (journeysError) throw journeysError;
+      const enrollmentsMap = new Map(
+        myEnrollments.map((e) => [e.journey_id, e])
+      );
 
-      // 2. Fetch Enrollments para el usuario actual
-      let enrollmentsMap: Map<string, Enrollment> = new Map();
-
-      if (profile) {
-        const { data: enrollmentsData } = await supabase
-          .schema('journeys') // <--- CRÍTICO
-          .from('enrollments')
-          .select('*')
-          .eq('user_id', profile.id);
-
-        if (enrollmentsData) {
-          enrollmentsMap = new Map(
-            enrollmentsData.map((e) => [e.journey_id, e as Enrollment])
-          );
-        }
-      }
-
-      // 3. Combinar datos
-      const combinedJourneys: JourneyWithEnrollment[] = (journeysData || []).map(
+      const combinedJourneys: JourneyWithEnrollment[] = fetchedJourneys.map(
         (journey) => {
           const enrollment = enrollmentsMap.get(journey.id);
           return {
-            ...(journey as Journey),
+            ...journey,
             enrollment,
             isEnrolled: !!enrollment,
-          };
+          } as JourneyWithEnrollment;
         }
       );
 
@@ -99,12 +87,12 @@ export function useJourneys(options: UseJourneysOptions = {}): UseJourneysReturn
 
       setJourneys(finalJourneys);
     } catch (err: any) {
-      console.error('Error fetching journeys:', JSON.stringify(err, null, 2));
+      console.error('Error fetching journeys:', err);
       setError(err?.message || 'Error al cargar journeys');
     } finally {
       setIsLoading(false);
     }
-  }, [currentOrg, profile, supabase, options.status, options.onlyEnrolled]);
+  }, [currentOrg, api, options.status, options.onlyEnrolled]);
 
   useEffect(() => {
     fetchJourneys();
@@ -127,12 +115,10 @@ export function useJourneys(options: UseJourneysOptions = {}): UseJourneysReturn
 }
 
 export function useJourneyDetails(journeyId: string) {
-  const { profile } = useAuth();
+  const api = useApi();
   const [journey, setJourney] = useState<JourneyWithEnrollment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const supabase = createClient();
 
   const fetchJourney = useCallback(async () => {
     if (!journeyId) {
@@ -145,41 +131,30 @@ export function useJourneyDetails(journeyId: string) {
       setIsLoading(true);
       setError(null);
 
-      const { data: journeyData, error: journeyError } = await supabase
-        .schema('journeys') // <--- CRÍTICO
-        .from('journeys')
-        .select('*')
-        .eq('id', journeyId)
-        .single();
+      // Usar el servicio de Journey
+      // Nota: El servicio getJourney(id) devuelve Journey, no JourneyWithEnrollment
+      // Necesitamos verificar enrollments también
+      
+      const [journeyData, enrollments] = await Promise.all([
+        api.journey.getJourney(journeyId),
+        api.journey.getMyEnrollments(), // Esto puede ser optimizable si hubiera un endpoint 'getJourneyEnrollment'
+      ]);
 
-      if (journeyError) throw journeyError;
-
-      let enrollment: Enrollment | undefined;
-
-      if (profile) {
-        const { data: enrollmentData } = await supabase
-          .schema('journeys') // <--- CRÍTICO
-          .from('enrollments')
-          .select('*')
-          .eq('journey_id', journeyId)
-          .eq('user_id', profile.id)
-          .maybeSingle();
-
-        enrollment = enrollmentData as Enrollment | undefined;
-      }
+      const enrollment = enrollments.find(e => e.journey_id === journeyId);
 
       setJourney({
-        ...(journeyData as Journey),
+        ...journeyData,
         enrollment,
         isEnrolled: !!enrollment,
-      });
+      } as JourneyWithEnrollment);
+
     } catch (err: any) {
-      console.error('Error fetching journey:', JSON.stringify(err, null, 2));
+      console.error('Error fetching journey:', err);
       setError(err?.message || 'Error al cargar el journey');
     } finally {
       setIsLoading(false);
     }
-  }, [journeyId, profile, supabase]);
+  }, [journeyId, api]);
 
   useEffect(() => {
     fetchJourney();
