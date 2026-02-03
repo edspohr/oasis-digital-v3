@@ -14,33 +14,33 @@ const MOCK_ORGS: Organization[] = [
     name: 'Fundación Summer',
     slug: 'fundacion-summer',
     description: 'Organización central de Summer',
-    logo_url: null,
+    logo_url: 'https://api.dicebear.com/7.x/initials/svg?seed=FS',
     type: 'enterprise',
     settings: {}, // Enterprise features
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
   },
   {
     id: 'org-tech-002',
     name: 'Tech Corp',
     slug: 'tech-corp',
     description: 'Empresa tecnológica innovadora',
-    logo_url: null,
+    logo_url: 'https://api.dicebear.com/7.x/initials/svg?seed=TC',
     type: 'community',
     settings: {},
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
   },
   {
     id: 'org-edu-003',
     name: 'Edu Global',
     slug: 'edu-global',
     description: 'Red educativa internacional',
-    logo_url: null,
+    logo_url: 'https://api.dicebear.com/7.x/initials/svg?seed=EG',
     type: 'community',
     settings: {},
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
   },
 ];
 
@@ -50,48 +50,48 @@ const MOCK_PROFILES: Profile[] = [
     id: 'usr-super-001',
     email: 'super@summer.com',
     full_name: 'Super Admin Summer',
-    avatar_url: null,
+    avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Super',
     is_platform_admin: true,
     status: 'active',
     metadata: {},
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
   },
   // Admin en Tech Corp
   {
     id: 'usr-admin-002',
     email: 'admin@techcorp.com',
     full_name: 'Admin Tech Corp',
-    avatar_url: null,
+    avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin',
     is_platform_admin: false,
     status: 'active',
     metadata: {},
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
   },
   // Participante/Suscriptor en Tech Corp
   {
     id: 'usr-part-003',
     email: 'user1@techcorp.com',
     full_name: 'Juan Participante',
-    avatar_url: null,
+    avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Juan',
     is_platform_admin: false,
     status: 'active',
     metadata: {},
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
   },
    // Participante en Edu Global
   {
     id: 'usr-part-004',
     email: 'student@eduglobal.com',
     full_name: 'Maria Estudiante',
-    avatar_url: null,
+    avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Maria',
     is_platform_admin: false,
     status: 'active',
     metadata: {},
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
   },
 ];
 
@@ -106,7 +106,7 @@ const MOCK_MEMBERSHIPS: OrganizationMember[] = [
     role: 'owner', // Or admin
     status: 'active',
     invited_by: null,
-    joined_at: new Date().toISOString(),
+    joined_at: '2024-01-01T00:00:00Z',
   },
   // Admin membership in Tech Corp
   {
@@ -116,7 +116,7 @@ const MOCK_MEMBERSHIPS: OrganizationMember[] = [
     role: 'admin',
     status: 'active',
     invited_by: 'usr-super-001',
-    joined_at: new Date().toISOString(),
+    joined_at: '2024-01-01T00:00:00Z',
   },
   // Participant in Tech Corp
   {
@@ -126,7 +126,7 @@ const MOCK_MEMBERSHIPS: OrganizationMember[] = [
     role: 'participante',
     status: 'active',
     invited_by: 'usr-admin-002',
-    joined_at: new Date().toISOString(),
+    joined_at: '2024-01-01T00:00:00Z',
   },
    // Participant in Edu Global
   {
@@ -136,7 +136,7 @@ const MOCK_MEMBERSHIPS: OrganizationMember[] = [
     role: 'participante',
     status: 'active',
     invited_by: 'usr-super-001',
-    joined_at: new Date().toISOString(),
+    joined_at: '2024-01-01T00:00:00Z',
   }
 ];
 
@@ -165,8 +165,8 @@ const MOCK_JOURNEYS: Journey[] = [
             order: 1,
             is_required: true,
             duration_minutes: 5,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            created_at: '2024-01-01T00:00:00Z',
+            updated_at: '2024-01-01T00:00:00Z'
         },
         {
             id: 'step-2',

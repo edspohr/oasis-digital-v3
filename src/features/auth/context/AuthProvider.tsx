@@ -119,6 +119,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setState((prev) => ({ ...prev, isLoading: true }));
 
       const authLogic = async () => {
+          // A. LOGICA MOCK
+          if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true') {
+            console.log("⚡ Modo Mock Activo: Saltando Supabase");
+            
+            // Importar dinamicamente para evitar bundle issues si fuera necesario, 
+            // aunque aquí importamos 'mockHandler' arriba idealmente o usamos import()
+            const { mockHandler } = await import("@/core/api/mockData");
+
+            // Simulamos latencia
+            await new Promise(r => setTimeout(r, 500));
+
+            const mockResponse = await mockHandler.get('/auth/me') as { user: Profile } | null;
+            if (!mockResponse || !mockResponse.user) {
+                 return { user: null, profile: null, myOrganizations: [], currentOrg: null, isLoading: false };
+            }
+
+            const user = mockResponse.user;
+
+            // Construir estructura myOrgs mocked
+             const myOrgsResp = await mockHandler.get('/organizations') as { data: Organization[] } | null;
+             const allOrgs = myOrgsResp?.data || [];
+             
+             // Por simplicidad en mock, asumimos membresía en todas o algunas
+             // De hecho, deberíamos usar el mockHandler para memberships, pero lo haremos simple:
+             // Filtramos las orgs "visibles" para este usuario mock o simplemente devolvemos todo lo que hay en mockData
+             const myOrgs: UserOrganization[] = allOrgs.map((org: Organization) => ({
+                 org,
+                 role: 'admin', // Default role for mock
+                 membershipId: `mem-${org.id}`
+             }));
+
+             let currentOrgData: CurrentOrganization | null = null;
+             if (myOrgs.length > 0) {
+                 const savedOrgId = getCookie(ORG_COOKIE_NAME);
+                 const activeOrg = myOrgs.find(o => o.org.id === savedOrgId) || myOrgs[0];
+                 
+                 if (activeOrg) {
+                     currentOrgData = {
+                         data: activeOrg.org,
+                         myMembership: {
+                             id: activeOrg.membershipId,
+                             organization_id: activeOrg.org.id,
+                             user_id: user.id,
+                             role: activeOrg.role,
+                             status: 'active',
+                             invited_by: null,
+                             joined_at: new Date().toISOString()
+                         }
+                     };
+                     setCookie(ORG_COOKIE_NAME, activeOrg.org.id);
+                 }
+             }
+
+            return {
+              user: { id: user.id, email: user.email } as User,
+              profile: user,
+              myOrganizations: myOrgs,
+              currentOrg: currentOrgData,
+              isLoading: false,
+            };
+          }
+
+          // B. LOGICA REAL (Supabase)
           // 1. Auth User
           const { data: { user }, error: authError } = await supabase.auth.getUser();
 

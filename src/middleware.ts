@@ -5,6 +5,11 @@ import { PUBLIC_ROUTES, matchRoute, findRouteConfig } from '@/core/config/routes
 const ORG_COOKIE_NAME = 'oasis_current_org';
 
 export async function middleware(request: NextRequest) {
+  // 0. MOCK MODE BYPASS
+  if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true') {
+    return NextResponse.next();
+  }
+
   let response = NextResponse.next({
     request: { headers: request.headers },
   });

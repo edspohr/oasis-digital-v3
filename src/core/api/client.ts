@@ -156,18 +156,24 @@ export function createApiClient(config: ApiClientConfig) {
       if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true') {
         const { mockHandler } = await import('./mockData');
         
-        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate latency
+        await new Promise(resolve => setTimeout(resolve, 600)); // Simulate latency
 
+        let result;
         if (method === 'GET') {
-           const result = await mockHandler.get(path, params);
-           if (result) return result as T;
+           result = await mockHandler.get(path, params);
         } else if (method === 'POST') {
-           const result = await mockHandler.post(path, body);
-           if (result) return result as T;
+           result = await mockHandler.post(path, body);
         }
-        // Fallback to real API if mock doesn't handle it, or throw?
-        // For now, let's log warning and continue or throw
+
+        if (result) {
+          return result as T;
+        }
+        
         console.warn(`[MOCK API] No mock handler for ${method} ${path}`);
+        // Return null or empty object if possible to avoid crash, or let it fall through 
+        // if you want to try real network (which might fail). 
+        // For strict offline demo, better to return null or throw.
+        return null as T;
       }
 
       const response = await fetch(finalUrl, {
