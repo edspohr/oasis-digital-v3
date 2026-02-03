@@ -5,8 +5,13 @@ import { PUBLIC_ROUTES, matchRoute, findRouteConfig } from '@/core/config/routes
 const ORG_COOKIE_NAME = 'oasis_current_org';
 
 export async function middleware(request: NextRequest) {
-  // 0. MOCK MODE BYPASS
-  if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true') {
+  // 0. MOCK MODE BYPASS (Robust Check)
+  // If explicitly enabled OR if Supabase keys are missing, we force bypass to avoid crash
+  const forceMock = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
+  const hasKeys = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (forceMock || !hasKeys) {
+    if (!hasKeys) console.warn("⚠️ Supabase keys missing in Middleware. Forcing Mock Mode.");
     return NextResponse.next();
   }
 
@@ -15,8 +20,8 @@ export async function middleware(request: NextRequest) {
   });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key',
     {
       cookies: {
         getAll() { return request.cookies.getAll(); },
