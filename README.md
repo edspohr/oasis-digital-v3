@@ -1,81 +1,55 @@
-# OASIS Platform
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-Monorepo para OASIS Digital - Backend y Frontend.
+## Getting Started
 
-## Estructura
+First, run the development server:
 
-```
-oasis-platform/
-├── apps/
-│   └── oasis-app/          # Frontend (Next.js)
-├── backend/                # Backend (FastAPI microservices)
-│   ├── services/           # Microservicios
-│   │   ├── auth_service/
-│   │   ├── journey_service/
-│   │   └── webhook_service/
-│   ├── common/             # Código compartido
-│   ├── scripts/            # Scripts de utilidad
-│   └── supabase/           # Migraciones y config
-└── README.md
-```
-
-## Desarrollo Local
-
-### Backend
 ```bash
-cd backend
-poetry install
-# Configurar .env (ver backend/README.md)
-uvicorn services.auth_service.main:app --reload --port 8001
-```
-
-### Frontend
-```bash
-cd apps/oasis-app
-npm install
 npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-### Con Docker (todos los servicios backend)
-```bash
-cd backend
-docker-compose up --build
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Project Architecture
+
+The project follows a 3-layer architecture to separate concerns and facilitate collaboration:
+
 ```
-
-## Actualizar Subtrees
-
-### Traer cambios del backend
-```bash
-git subtree pull --prefix=backend https://github.com/fsotosa-ops/oasis-api.git main --squash
+src/
+├── app/ (Router)
+├── frontend/
+│   ├── actions/
+│   ├── components/
+│   └── hooks/
+├── middleware/
+│   └── connectors/
+├── backend/
+│   ├── auth/ (Orchestrators)
+│   └── supabase/ (DB Client)
+└── middleware.ts (Next.js config file - distinct from middleware folder)
 ```
-
-### Traer cambios del frontend
-```bash
-git subtree pull --prefix=apps/oasis-app https://github.com/fsotosa-ops/oasis-app.git main --squash
-```
-
-### Pushear cambios al backend (desde el monorepo)
-```bash
-git subtree push --prefix=backend https://github.com/fsotosa-ops/oasis-api.git main
-```
-
-### Pushear cambios al frontend (desde el monorepo)
-```bash
-git subtree push --prefix=apps/oasis-app https://github.com/fsotosa-ops/oasis-app.git main
-```
-
-## CI/CD
-
-Los workflows de GitHub Actions están configurados en `backend/.github/workflows/`:
-- `ci.yml` - Lint y tests en PRs
-- `deploy-dev.yml` - Deploy a Cloud Run (dev)
-- `deploy-prod.yml` - Deploy a Cloud Run (prod)
-
-## Servicios
-
-| Servicio | Puerto Local | Descripción |
-|----------|--------------|-------------|
-| auth_service | 8001 | Autenticación y usuarios |
-| journey_service | 8002 | Experiencia y gamificación |
-| webhook_service | 8004 | Gateway de webhooks externos |
-| oasis-app | 3000 | Frontend Next.js |

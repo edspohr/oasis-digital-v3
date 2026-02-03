@@ -113,7 +113,7 @@ export function LoginForm() {
         // Refresh para cargar el AuthProvider con la nueva sesion
         window.location.href = "/";
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error en login:", error);
       toast.error("Error de conexion. Intenta nuevamente.");
     } finally {
