@@ -4,7 +4,7 @@ import {
   OrganizationMember, 
   Journey, 
   EnrollmentWithJourney 
-} from '@/core/types';
+} from '../types';
 
 // --- MOCK CONSTANTS ---
 
